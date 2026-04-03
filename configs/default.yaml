@@ -1,0 +1,9 @@
+profile: PROFILE_SCAFFOLD_ONLY
+seed: 0
+env: matrix_coordination
+method: ippo
+steps: 200
+teammate_block_width: 2
+n_teammates: 1
+picr_lambda: 0.2
+teammate_dropout_p: 0.0
