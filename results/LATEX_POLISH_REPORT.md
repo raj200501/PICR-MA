@@ -1,6 +1,22 @@
 # LATEX POLISH REPORT
-- Added figures: method_overview.pdf, learning_curves_mpe.pdf, zero_shot_crossplay_results.pdf, permutation_sensitivity_results.pdf, runtime_overhead.pdf, optional_matrix_games_summary.pdf
-- Added tables: main_results.tex, crossplay_results.tex, permutation_sensitivity.tex, runtime_results.tex
-- Densified sections: Results
-- Visual narrative: grounded in the currently available saved runs; depends on the active profile and completed experiments
-- Compilation: pdflatex not available
+- Added or refreshed figures:
+  - `method_overview.pdf`
+  - `learning_curves_mpe.pdf`
+  - `zero_shot_crossplay_results.pdf`
+  - `permutation_sensitivity_results.pdf`
+  - `runtime_overhead.pdf`
+  - `optional_matrix_games_summary.pdf`
+- Added or refreshed tables:
+  - `main_results.tex`
+  - `crossplay_results.tex`
+  - `permutation_sensitivity.tex`
+  - `runtime_results.tex`
+- Sections densified:
+  - abstract
+  - experimental setup
+  - results
+  - discussion and limitations
+- Visual narrative:
+  - improved relative to the original toy-run paper
+  - still not convincing enough for a serious ICML submission because the core empirical story is mixed and the appendix package remains thin
+- Compilation: `pdflatex` not available

@@ -54,7 +54,7 @@
 ]
 
 \begin{abstract}
-Multi-agent reinforcement learning (MARL) policies frequently overfit to arbitrary agent orderings and teammate idiosyncrasies, undermining zero-shot coordination (ZSC) and wasting capacity on spurious distinctions. We introduce \emph{\longmethod} (\method), a drop-in regularizer that enforces permutation invariance over teammate-specific features without changing the inference-time policy architecture. During training, we form two independently permuted versions of the teammate-related portion of an agent's observation and minimize a symmetric Kullback--Leibler divergence between the corresponding action distributions. This consistency loss biases solutions toward exchangeable policies while keeping the execution path unchanged. The current artifact package implements \method\ on top of a lightweight shared-parameter on-policy baseline, evaluates it on PettingZoo's MPE environments (\texttt{simple\_spread\_v3}, \texttt{simple\_adversary\_v3}) and tiny matrix games, and reports in-team learning, held-out partner cross-play, and permutation sensitivity from saved checkpoints. Across the present lean-safe runs, permutation sensitivity falls consistently while zero-shot coordination effects are environment dependent. All experiments are designed to run on a single machine.
+Multi-agent reinforcement learning (MARL) policies frequently overfit to arbitrary agent orderings and teammate idiosyncrasies, undermining zero-shot coordination (ZSC) and wasting capacity on spurious distinctions. We study \emph{\longmethod} (\method), a drop-in regularizer that enforces permutation consistency over teammate-specific feature blocks without changing the inference-time policy architecture. During training, we form two independently permuted versions of the teammate-related portion of an agent's observation and minimize a symmetric Kullback--Leibler divergence between the corresponding action distributions. The current artifact package implements \method\ on top of a lightweight shared-parameter on-policy baseline, evaluates it on PettingZoo MPE (\texttt{simple\_spread\_v3}, \texttt{simple\_adversary\_v3}) and matrix games, and reports in-team learning, held-out partner cross-play, and permutation sensitivity from saved checkpoints. In a lean-safe 5-seed, 50k-step MPE cohort, a tuned \method\ configuration improves held-out-partner cross-play over IPPO on \texttt{simple\_adversary\_v3} while reducing permutation sensitivity, but it underperforms IPPO, Deep Sets, and Other-Play on \texttt{simple\_spread\_v3}. The resulting evidence supports a mixed tradeoff story rather than a uniformly stronger default.
 \end{abstract}
 
 \section{Introduction}
@@ -63,7 +63,7 @@ Self-play often discovers conventions that do not transfer to unfamiliar partner
 We ask: \emph{Can we remove this brittleness with an architectural-agnostic training trick simple enough for single-file reproduction?} We answer yes with \method, a minimal regularizer enforcing permutation invariance over teammate-related features via \emph{consistency}: the action distribution should not change when we reshuffle teammate blocks in the observation. Concretely, for each observation we sample two random permutations of teammate blocks, compute two forward passes, and penalize the symmetric KL between the action distributions. Crucially, this imposes no constraints on the base RL algorithm (IPPO, DQN, etc.) and can be bolted onto existing code.
 
 \textbf{Contributions.}
-(i) We propose \method, a \emph{one-line} invariance regularizer that requires no architectural changes and can be added to any decentralized policy. (ii) We present a tiny, reproducible ZSC evaluation suite on MPE \citep{terry2021pettingzoo} and matrix games, including a simple partner-pool protocol. (iii) We connect \method to exchangeability and invariance regularization, contrasting with permutation-invariant architectures \citep{zaheer2017deepsets} and centralized critics \citep{lowe2017maddpg, rashid2018qmix, sunehag2018vdn}.
+(i) We implement \method\ as a drop-in consistency regularizer for shared-parameter decentralized MARL. (ii) We build a reproducible single-machine evaluation stack covering held-out partner cross-play, permutation-sensitivity diagnostics, and explicit teammate-block slicing on MPE \citep{terry2021pettingzoo} and matrix games. (iii) We provide a lean-safe empirical audit against IPPO, Deep Sets, and Other-Play that clarifies where the method helps, where it does not, and how sensitive it is to the regularization weight.
 
 \paragraph{Why this matters.} In many cooperative domains (robot swarms, sensor networks, traffic), teammate ordering in observations is semantically meaningless. Yet vanilla concatenation forces a spurious ordering that policies exploit. Enforcing invariance via a lightweight regularizer is a practical alternative to bespoke set-/graph-equivariant architectures \citep{zaheer2017deepsets, liu2020pic}, immediately useful where simplicity and limited compute are priorities.
 
@@ -143,7 +143,7 @@ If $\lambda\to\infty$ and optimization succeeds, the learned policy becomes inva
 
 \textbf{Partner-pool protocol (ZSC).} We hold out a \emph{partner pool} of policies trained independently under different seeds (and optionally with/without \method). At test time, an evaluated agent must coordinate with a randomly sampled partner from the pool without further learning \citep{hu2020otherplay}. We report mean episodic return/success across partner samples.
 
-\textbf{Training details.} The current lean-safe runs use 2 seeds per method/environment, 600 environment steps for the matrix games, and 1000 environment steps for each MPE task. The shared on-policy learner uses hidden size 64, clip ratio 0.2, $\gamma{=}0.99$, $\lambda_{\mathrm{GAE}}{=}0.95$, learning rate $3\times 10^{-3}$, and four update epochs per rollout. For \method\ we use $\lambda{=}0.2$ in the main runs; Stage 2 sweeps remain future work.
+\textbf{Training details.} The main reported MPE cohort uses 5 seeds per method/environment and 50k environment steps per seed. Matrix games remain small sanity checks and are not the main source of evidence. The shared on-policy learner uses hidden size 64, clip ratio 0.2, $\gamma{=}0.99$, $\lambda_{\mathrm{GAE}}{=}0.95$, learning rate $3\times 10^{-3}$, and four update epochs per rollout. For \method\ we selected $\lambda{=}0.02$ for the main 50k runs after a 20k, 3-seed sweep over $\{0.02, 0.05, 0.10\}$; larger $\lambda$ values reduced permutation sensitivity more aggressively but degraded held-out partner performance on \texttt{simple\_spread\_v3}. A teammate-dropout ablation with dropout probability $0.1$ hurt cross-play on both MPE tasks and was not used in the main cohort.
 
 \textbf{Metrics.} (i) \emph{In-team} mean episodic return during training; (ii) \emph{Zero-shot coordination} cross-play mean return with ad hoc partners; (iii) \emph{Permutation sensitivity} via Jensen--Shannon divergence $\JS(p, p^{\pi})$ between action distributions under different teammate orderings (lower is better). We also report collision counts (\texttt{simple\_spread}) and capture rates (\texttt{simple\_adversary}).
 
@@ -153,7 +153,7 @@ If $\lambda\to\infty$ and optimization succeeds, the learned policy becomes inva
 \section{Results}
 \label{sec:results}
 \paragraph{Main performance and zero-shot coordination.}
-Table~\ref{tab:main-results} summarizes the currently available runs. Figure~\ref{fig:learning-curves} shows the training curves on the MPE tasks that completed under the active profile, while Figure~\ref{fig:zsc-heatmaps} visualizes the held-out partner cross-play matrices generated from saved checkpoints.
+Table~\ref{tab:main-results} summarizes the 50k-step, 5-seed MPE cohort selected by the hardened analysis pipeline, Figure~\ref{fig:learning-curves} shows the corresponding learning curves, and Figure~\ref{fig:zsc-heatmaps} visualizes the full held-out partner cross-play matrices. No method dominates both MPE tasks. On \texttt{simple\_adversary\_v3}, tuned \method\ improves same-family held-out cross-play over IPPO (20.159 $\pm$ 2.043 versus 17.429 $\pm$ 3.770) and substantially outperforms Deep Sets (11.356 $\pm$ 3.244), but it remains slightly below Other-Play (20.934 $\pm$ 3.429). On \texttt{simple\_spread\_v3}, \method\ is the weakest of the four methods on held-out same-family cross-play (27.206 $\pm$ 0.730 in magnitude, versus 25.649 $\pm$ 0.271 for IPPO, 25.550 $\pm$ 0.489 for Deep Sets, and 25.533 $\pm$ 0.566 for Other-Play). The core empirical takeaway is therefore mixed: \method\ helps in the adversarial-cooperative setting, but it is not a uniformly better replacement for the baselines.
 
 \begin{table*}[t]
 \centering
@@ -176,15 +176,16 @@ Table~\ref{tab:main-results} summarizes the currently available runs. Figure~\re
 \label{fig:zsc-heatmaps}
 \end{figure*}
 
-\paragraph{Permutation sensitivity.}
+\paragraph{Permutation sensitivity and mechanism.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{latex/figures/permutation_sensitivity_results.pdf}
 \caption{Policy sensitivity to teammate-order permutations, measured with Jensen--Shannon divergence over action distributions.}
 \label{fig:perm-sensitivity}
 \end{figure}
+At 50k steps, \method\ reduces permutation sensitivity relative to IPPO on both MPE environments: JS drops from 0.0263 $\pm$ 0.0063 to 0.0127 $\pm$ 0.0019 on \texttt{simple\_spread\_v3}, and from 0.0102 $\pm$ 0.0066 to 0.0053 $\pm$ 0.0025 on \texttt{simple\_adversary\_v3}. However, lower sensitivity does not translate monotonically into better held-out coordination. Across individual runs in the 50k cohort, the correlation between permutation sensitivity and held-out cross-play is weakly positive on both environments, indicating that invariance is not by itself a sufficient explanation for the observed ZSC behavior. This weakens the strongest possible mechanistic claim for \method\ and pushes the paper toward a tradeoff framing.
 
-\paragraph{Compute and matrix-game diagnostics.}
+\paragraph{Ablations, compute, and matrix-game diagnostics.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{latex/figures/runtime_overhead.pdf}
@@ -198,14 +199,13 @@ Table~\ref{tab:main-results} summarizes the currently available runs. Figure~\re
 \caption{Matrix-game summary under the current small-compute regime.}
 \label{fig:matrix-summary}
 \end{figure}
+The 20k lambda sweep shows a clear tradeoff. The mild setting $\lambda{=}0.02$ gives the best PICR-MA held-out cross-play among the sweep values, matching or slightly improving IPPO on the pilot environments, while larger $\lambda$ values reduce JS more strongly but consistently hurt \texttt{simple\_spread\_v3}. Teammate dropout with probability $0.1$ is uniformly harmful in the 20k pilot, reducing cross-play on both MPE tasks and therefore does not strengthen the method. Runtime overhead is non-trivial but moderate: at 50k steps, \method\ is roughly 1.6$\times$ IPPO on \texttt{simple\_spread\_v3} and 1.3$\times$ IPPO on \texttt{simple\_adversary\_v3}, while remaining lighter than Deep Sets on \texttt{simple\_spread\_v3}. Matrix games remain useful sanity checks but do not drive the headline claim because the MPE outcomes are mixed.
 
 \section{Discussion and Limitations (to accompany Results)}
 \label{sec:discussion}
-\begin{itemize}[leftmargin=*]
-  \item \textbf{When \method helps most:} symmetric tasks with arbitrary teammate ordering; limited partner diversity at train time; small to medium team sizes.
-  \item \textbf{When it may not help:} role-specialized tasks with informative ordering; strong centralized critics or set-equivariant encoders may subsume benefits.
-  \item \textbf{Failure modes:} too-large $\lambda$ can harm exploration (over-smoothing); degenerate near-uniform actions under heavy regularization (detect via entropy/JS diagnostics).
-\end{itemize}
+The present evidence does not support \method\ as a new default for order-sensitive MARL. The method appears most credible as a small architectural-free regularizer that can help in some cooperative settings with asymmetric partner uncertainty, but its gains are neither uniform nor robust enough to dominate stronger baselines. In particular, the method loses to IPPO, Deep Sets, and Other-Play on \texttt{simple\_spread\_v3}, and the relationship between lower permutation sensitivity and better cross-play is weaker than the motivating story would suggest.
+
+There are several important limitations. First, the implementation uses a lightweight NumPy learner rather than a standard PyTorch PPO stack; while this keeps the artifact lean-safe and fully reproducible on a laptop, it weakens external credibility relative to a more conventional training stack. Second, the 50k-step MPE runs are materially stronger than the original 1k-step scaffold, but the learning curves on \texttt{simple\_spread\_v3} are still improving late in training, so the final scale remains modest by conference standards. Third, the method is sensitive to the regularization weight: larger $\lambda$ values improve invariance diagnostics but can reduce cross-play substantially, and teammate dropout does not rescue this behavior. These limitations are central to the internal review outcome and should temper any claim of broad effectiveness.
 
 \section{Broader Impact}
 By reducing brittle dependence on arbitrary ordering artifacts, \method can make cooperative MARL deployments more robust and reproducible with minimal engineering overhead. However, improved zero-shot coordination may also accelerate deployment of multi-agent systems in settings where safety assurances and oversight are immature; careful risk assessment is warranted.

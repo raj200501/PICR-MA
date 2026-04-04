@@ -2,24 +2,14 @@
 \toprule
 Environment & Method & Train return & Cross-play & JS $\downarrow$ & Env metric \\
 \midrule
-matrix\_coordination & ippo & 0.867 $\pm$ 0.047 & 0.722 $\pm$ 0.039 & 0.010 $\pm$ 0.004 & succ=1.000 \\
-matrix\_coordination & picr\_ma & 0.867 $\pm$ 0.000 & 0.889 $\pm$ 0.079 & 0.003 $\pm$ 0.001 & succ=1.000 \\
-matrix\_coordination & deepsets & 0.767 $\pm$ 0.165 & 1.000 $\pm$ 0.000 & 0.000 $\pm$ 0.000 & succ=1.000 \\
-matrix\_coordination & otherplay & 0.867 $\pm$ 0.000 & 0.667 $\pm$ 0.236 & 0.007 $\pm$ 0.001 & succ=1.000 \\
+simple\_adversary\_v3 & ippo & 2.346 $\pm$ 1.813 & 17.429 $\pm$ 3.770 & 0.010 $\pm$ 0.007 & margin=0.260 \\
+simple\_adversary\_v3 & picr\_ma & 6.585 $\pm$ 3.502 & 20.159 $\pm$ 2.043 & 0.005 $\pm$ 0.003 & margin=0.345 \\
+simple\_adversary\_v3 & deepsets & 7.965 $\pm$ 1.698 & 11.356 $\pm$ 3.244 & 0.000 $\pm$ 0.000 & margin=0.392 \\
+simple\_adversary\_v3 & otherplay & 3.603 $\pm$ 1.497 & 20.934 $\pm$ 3.429 & 0.014 $\pm$ 0.007 & margin=0.310 \\
 \midrule
-matrix\_staghunt & ippo & 0.800 $\pm$ 0.132 & 0.854 $\pm$ 0.103 & 0.004 $\pm$ 0.000 & succ=1.000 \\
-matrix\_staghunt & picr\_ma & 0.717 $\pm$ 0.078 & 0.767 $\pm$ 0.165 & 0.003 $\pm$ 0.001 & succ=1.000 \\
-matrix\_staghunt & deepsets & 0.773 $\pm$ 0.160 & 0.233 $\pm$ 0.118 & 0.000 $\pm$ 0.000 & succ=1.000 \\
-matrix\_staghunt & otherplay & 0.803 $\pm$ 0.120 & 0.533 $\pm$ 0.330 & 0.008 $\pm$ 0.000 & succ=0.750 \\
-\midrule
-simple\_adversary\_v3 & ippo & 18.425 $\pm$ 1.579 & 22.232 $\pm$ 0.644 & 0.012 $\pm$ 0.002 & margin=0.483 \\
-simple\_adversary\_v3 & picr\_ma & 17.811 $\pm$ 2.782 & 28.725 $\pm$ 4.048 & 0.010 $\pm$ 0.001 & margin=0.741 \\
-simple\_adversary\_v3 & deepsets & 18.094 $\pm$ 6.545 & 28.899 $\pm$ 2.181 & 0.000 $\pm$ 0.000 & margin=0.600 \\
-simple\_adversary\_v3 & otherplay & 16.145 $\pm$ 0.056 & 27.491 $\pm$ 4.897 & 0.010 $\pm$ 0.000 & margin=0.719 \\
-\midrule
-simple\_spread\_v3 & ippo & -35.641 $\pm$ 5.275 & -52.552 $\pm$ 0.092 & 0.004 $\pm$ 0.002 & coll=0.082 \\
-simple\_spread\_v3 & picr\_ma & -35.400 $\pm$ 2.882 & -55.275 $\pm$ 0.610 & 0.003 $\pm$ 0.001 & coll=0.080 \\
-simple\_spread\_v3 & deepsets & -31.078 $\pm$ 1.648 & -33.349 $\pm$ 1.801 & 0.000 $\pm$ 0.000 & coll=0.095 \\
-simple\_spread\_v3 & otherplay & -37.912 $\pm$ 6.236 & -50.528 $\pm$ 1.064 & 0.006 $\pm$ 0.000 & coll=0.053 \\
+simple\_spread\_v3 & ippo & -21.952 $\pm$ 0.472 & -25.649 $\pm$ 0.271 & 0.026 $\pm$ 0.006 & coll=0.164 \\
+simple\_spread\_v3 & picr\_ma & -23.425 $\pm$ 0.625 & -27.206 $\pm$ 0.730 & 0.013 $\pm$ 0.002 & coll=0.155 \\
+simple\_spread\_v3 & deepsets & -24.776 $\pm$ 1.413 & -25.550 $\pm$ 0.489 & 0.000 $\pm$ 0.000 & coll=0.065 \\
+simple\_spread\_v3 & otherplay & -21.626 $\pm$ 0.209 & -25.533 $\pm$ 0.566 & 0.025 $\pm$ 0.013 & coll=0.079 \\
 \bottomrule
 \end{tabular}

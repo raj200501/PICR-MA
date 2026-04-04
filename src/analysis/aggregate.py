@@ -18,7 +18,9 @@ def aggregate_results(results_dir: str | Path = "results") -> list[dict]:
         row["run_dir"] = str(summary_path.parent)
         rows.append(row)
     tags = {row.get("run_tag") for row in rows}
-    if {"stage1", "stage2"} & tags:
+    if any(str(tag).startswith("hardmain") for tag in tags):
+        rows = [row for row in rows if str(row.get("run_tag", "")).startswith("hardmain")]
+    elif {"stage1", "stage2"} & tags:
         rows = [row for row in rows if row.get("run_tag") in {"stage1", "stage2"}]
     elif {"stage0", "smoke"} & tags:
         rows = [row for row in rows if row.get("run_tag") in {"stage0", "smoke"}]

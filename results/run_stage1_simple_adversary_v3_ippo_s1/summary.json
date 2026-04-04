@@ -19,10 +19,12 @@
   },
   "git_commit": "5ab811341352e2e6a07897da2fd5330ec4436e67",
   "train_return": 20.657255299999996,
-  "crossplay_return": 23.142935718436007,
+  "crossplay_return": 24.468925017180574,
   "permutation_js": 0.00892325387390204,
   "in_team_eval_return": 18.973634283339045,
   "collision_mean": 0.0,
   "goal_margin_mean": 0.7589453713335617,
-  "success_mean": 0.0
+  "success_mean": 0.0,
+  "crossplay_pool_run_tag": "stage1",
+  "crossplay_partner_count": 7
 }

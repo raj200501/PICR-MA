@@ -29,14 +29,23 @@
 ## Baseline simplifications
 
 - `Other-Play` is implemented as lightweight teammate-order randomization during training rather than a larger environment-symmetry framework.
+- During the hardening pass, `Other-Play` was updated to use episode-consistent teammate-order randomization rather than resampling every step.
 - `Deep Sets` is implemented as a compact mean-aggregated encoder for teammate blocks to stay CPU-friendly.
 
 ## Reduced scope forced by hardware / local setup
 
 - Active profile: `PROFILE_LEAN_SAFE`
-- Seeds: 2 per method/environment in Stage 1
-- Stage 2 was not run.
-  Reason: the lean-safe scope already produced a complete Stage 1 core matrix, while lambda sweeps and teammate-dropout ablations would expand runtime and artifact volume beyond the current target for this turn.
+- Main hardening cohort: 5 seeds per method/environment at 50k MPE steps.
+- The full hardening pass did run a lambda sweep and teammate-dropout ablation, but only at 20k pilot scale.
+  Reason: this was sufficient to establish method sensitivity without committing to much larger ablation budgets on the constrained machine.
+- The project was not scaled to 250k+ full-baseline MPE runs.
+  Reason: after the 50k, 5-seed main cohort, the evidence was already mixed enough that further scale was unlikely to change the internal PASS/FAIL decision proportionally to the extra runtime.
+- PICR-MA main-cohort lambda was changed from the original `0.2` scaffold default to `0.02`.
+  Reason: the 20k lambda sweep showed that the default setting was too destructive; `0.02` was the least bad setting for held-out partner cross-play.
+- Teammate dropout is not part of the main method story.
+  Reason: the `drop20k_p010` ablation hurt held-out partner cross-play on both MPE tasks.
+- Main approval remains blocked.
+  Reason: the 50k, 5-seed evidence supports only a mixed tradeoff claim and does not clear the internal ICML bar.
 
 - LaTeX compilation was not completed in automation.
   Reason: `pdflatex` was not available in the local environment.
