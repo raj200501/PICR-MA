@@ -1,0 +1,16 @@
+env: matrix_coordination
+method: ippo
+seed: 0
+profile: PROFILE_LEAN_SAFE
+total_env_steps: 60
+max_cycles: 1
+hidden_dim: 64
+learning_rate: 0.003
+gamma: 0.99
+gae_lambda: 0.95
+clip_ratio: 0.2
+update_epochs: 4
+picr_lambda: 0.2
+teammate_dropout_p: 0.0
+eval_episodes: 8
+run_tag: smoke

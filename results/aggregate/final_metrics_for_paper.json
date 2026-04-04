@@ -1,0 +1,186 @@
+{
+  "matrix_coordination": {
+    "deepsets": {
+      "train_return_mean": 0.7666665315628052,
+      "train_return_se": 0.16499166190624237,
+      "crossplay_return_mean": 1.0,
+      "crossplay_return_se": 0.0,
+      "permutation_js_mean": 0.0,
+      "permutation_js_se": 0.0,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    },
+    "ippo": {
+      "train_return_mean": 0.8666665554046631,
+      "train_return_se": 0.04714047163724899,
+      "crossplay_return_mean": 0.7222222089767456,
+      "crossplay_return_se": 0.03928370773792267,
+      "permutation_js_mean": 0.010243888944387436,
+      "permutation_js_se": 0.0042930180206894875,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    },
+    "otherplay": {
+      "train_return_mean": 0.8666666150093079,
+      "train_return_se": 0.0,
+      "crossplay_return_mean": 0.6666666865348816,
+      "crossplay_return_se": 0.235702246427536,
+      "permutation_js_mean": 0.006711648777127266,
+      "permutation_js_se": 0.0012971725082024932,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    },
+    "picr_ma": {
+      "train_return_mean": 0.8666666150093079,
+      "train_return_se": 0.0,
+      "crossplay_return_mean": 0.8888888955116272,
+      "crossplay_return_se": 0.07856741547584534,
+      "permutation_js_mean": 0.0029011163860559464,
+      "permutation_js_se": 0.0008226574282161891,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    }
+  },
+  "matrix_staghunt": {
+    "deepsets": {
+      "train_return_mean": 0.7733333110809326,
+      "train_return_se": 0.16027753055095673,
+      "crossplay_return_mean": 0.23333333432674408,
+      "crossplay_return_se": 0.117851123213768,
+      "permutation_js_mean": 0.0,
+      "permutation_js_se": 0.0,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    },
+    "ippo": {
+      "train_return_mean": 0.7999999523162842,
+      "train_return_se": 0.13199329376220703,
+      "crossplay_return_mean": 0.8541666865348816,
+      "crossplay_return_se": 0.10311972349882126,
+      "permutation_js_mean": 0.0039656260050833225,
+      "permutation_js_se": 0.00011580867430893704,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    },
+    "otherplay": {
+      "train_return_mean": 0.8033334016799927,
+      "train_return_se": 0.12020818889141083,
+      "crossplay_return_mean": 0.5333333611488342,
+      "crossplay_return_se": 0.3299831748008728,
+      "permutation_js_mean": 0.007645707111805677,
+      "permutation_js_se": 0.0003307022852823138,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 0.75
+    },
+    "picr_ma": {
+      "train_return_mean": 0.7166666388511658,
+      "train_return_se": 0.07778171449899673,
+      "crossplay_return_mean": 0.7666666507720947,
+      "crossplay_return_se": 0.1649915724992752,
+      "permutation_js_mean": 0.002697492018342018,
+      "permutation_js_se": 0.0012366233859211206,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.0,
+      "success_mean": 1.0
+    }
+  },
+  "simple_adversary_v3": {
+    "deepsets": {
+      "train_return_mean": 18.09354019165039,
+      "train_return_se": 6.545463562011719,
+      "crossplay_return_mean": 28.89874267578125,
+      "crossplay_return_se": 2.1811716556549072,
+      "permutation_js_mean": 0.0,
+      "permutation_js_se": 0.0,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.6001543656737003,
+      "success_mean": 0.0
+    },
+    "ippo": {
+      "train_return_mean": 18.424758911132812,
+      "train_return_se": 1.5786125659942627,
+      "crossplay_return_mean": 22.23200225830078,
+      "crossplay_return_se": 0.6441265940666199,
+      "permutation_js_mean": 0.012360373511910439,
+      "permutation_js_se": 0.0024304103571921587,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.4825742441868469,
+      "success_mean": 0.0
+    },
+    "otherplay": {
+      "train_return_mean": 16.14490509033203,
+      "train_return_se": 0.055743761360645294,
+      "crossplay_return_mean": 27.49110984802246,
+      "crossplay_return_se": 4.89671516418457,
+      "permutation_js_mean": 0.00962350144982338,
+      "permutation_js_se": 0.00044959361548535526,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.718835929612013,
+      "success_mean": 0.0
+    },
+    "picr_ma": {
+      "train_return_mean": 17.811216354370117,
+      "train_return_se": 2.7818782329559326,
+      "crossplay_return_mean": 28.724632263183594,
+      "crossplay_return_se": 4.0479960441589355,
+      "permutation_js_mean": 0.010316991247236729,
+      "permutation_js_se": 0.001140028121881187,
+      "collision_mean": 0.0,
+      "goal_margin_mean": 0.7414189428459388,
+      "success_mean": 0.0
+    }
+  },
+  "simple_spread_v3": {
+    "deepsets": {
+      "train_return_mean": -31.078289031982422,
+      "train_return_se": 1.648210883140564,
+      "crossplay_return_mean": -33.34858703613281,
+      "crossplay_return_se": 1.801042079925537,
+      "permutation_js_mean": 0.0,
+      "permutation_js_se": 0.0,
+      "collision_mean": 0.095,
+      "goal_margin_mean": 0.0,
+      "success_mean": 0.0
+    },
+    "ippo": {
+      "train_return_mean": -35.64080810546875,
+      "train_return_se": 5.274817943572998,
+      "crossplay_return_mean": -52.55234146118164,
+      "crossplay_return_se": 0.09228069335222244,
+      "permutation_js_mean": 0.004344534128904343,
+      "permutation_js_se": 0.001725195674225688,
+      "collision_mean": 0.08249999999999999,
+      "goal_margin_mean": 0.0,
+      "success_mean": 0.0
+    },
+    "otherplay": {
+      "train_return_mean": -37.911800384521484,
+      "train_return_se": 6.236158847808838,
+      "crossplay_return_mean": -50.528236389160156,
+      "crossplay_return_se": 1.063642144203186,
+      "permutation_js_mean": 0.00556363957002759,
+      "permutation_js_se": 0.0004571382305584848,
+      "collision_mean": 0.052500000000000005,
+      "goal_margin_mean": 0.0,
+      "success_mean": 0.0
+    },
+    "picr_ma": {
+      "train_return_mean": -35.399864196777344,
+      "train_return_se": 2.881934881210327,
+      "crossplay_return_mean": -55.27460479736328,
+      "crossplay_return_se": 0.6097010374069214,
+      "permutation_js_mean": 0.003375100437551737,
+      "permutation_js_se": 0.0007700143614783883,
+      "collision_mean": 0.08,
+      "goal_margin_mean": 0.0,
+      "success_mean": 0.0
+    }
+  }
+}

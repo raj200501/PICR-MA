@@ -1,9 +1,25 @@
+from __future__ import annotations
+
+import numpy as np
+
+from src.envs.observation_slicing import ObservationSlicing, permute_teammates
+from src.methods.picr_ma import all_permutations
 from src.utils.metrics_common import js_divergence
 
-def sensitivity(policy_probs_fn,obs,permute_fn,perms):
-    p=policy_probs_fn([obs])[0]
-    vals=[]
-    for perm in perms:
-        q=policy_probs_fn([permute_fn(obs,perm)])[0]
-        vals.append(js_divergence(p,q))
-    return sum(vals)/len(vals)
+
+def sensitivity(
+    policy_probs_fn,
+    obs: np.ndarray,
+    slicing: ObservationSlicing,
+    permutations: list[tuple[int, ...]] | None = None,
+) -> tuple[float, list[float]]:
+    original = policy_probs_fn(np.asarray([obs], dtype=np.float32))[0]
+    values = []
+    perms = permutations if permutations is not None else all_permutations(slicing)
+    for permutation in perms:
+        permuted_obs = permute_teammates(obs, slicing, permutation)
+        permuted = policy_probs_fn(np.asarray([permuted_obs], dtype=np.float32))[0]
+        values.append(js_divergence(original, permuted))
+    if not values:
+        return 0.0, [0.0]
+    return float(np.mean(values)), values

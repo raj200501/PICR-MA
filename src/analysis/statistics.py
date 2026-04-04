@@ -1,4 +1,14 @@
-import pandas as pd
+from __future__ import annotations
 
-def mean_se(df,col):
-    return df[col].mean(), df[col].std(ddof=1)/(len(df)**0.5 if len(df)>1 else 1.0)
+import math
+
+import numpy as np
+
+
+def mean_se(values) -> tuple[float, float]:
+    arr = np.asarray(list(values), dtype=np.float32)
+    if len(arr) == 0:
+        return 0.0, 0.0
+    mean = float(arr.mean())
+    se = float(arr.std(ddof=0) / math.sqrt(len(arr)))
+    return mean, se

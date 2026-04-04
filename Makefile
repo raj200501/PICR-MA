@@ -1,32 +1,34 @@
-PYTHONPATH=. 
+PYTHON ?= ./.venv/bin/python
+ENV = PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp
 
 install:
-	python -m pip install -r requirements.txt
+	python3 -m venv .venv
+	./.venv/bin/pip install -r requirements.txt
 
 preflight:
-	PYTHONPATH=. python scripts/preflight.py
+	$(ENV) $(PYTHON) scripts/preflight.py
 
 smoke:
-	PYTHONPATH=. python scripts/install_check.py
-	PYTHONPATH=. python scripts/smoke_test.py
+	$(ENV) $(PYTHON) scripts/install_check.py
+	$(ENV) $(PYTHON) scripts/smoke_test.py
 
 stage1:
-	PYTHONPATH=. python scripts/run_stage1.py
+	$(ENV) $(PYTHON) scripts/run_stage1.py
 
 stage2:
-	PYTHONPATH=. python scripts/run_stage2.py
+	$(ENV) $(PYTHON) scripts/run_stage2.py
 
 plots:
-	PYTHONPATH=. python scripts/make_plots.py
+	$(ENV) $(PYTHON) scripts/make_plots.py
 
 tables:
-	PYTHONPATH=. python scripts/make_tables.py
+	$(ENV) $(PYTHON) scripts/make_tables.py
 
 paper:
-	PYTHONPATH=. python scripts/make_paper.py
+	$(ENV) $(PYTHON) scripts/make_paper.py
 
 clean_artifacts:
-	PYTHONPATH=. python scripts/cleanup_artifacts.py
+	$(ENV) $(PYTHON) scripts/cleanup_artifacts.py
 
 report:
-	PYTHONPATH=. python scripts/report_status.py
+	$(ENV) $(PYTHON) scripts/report_status.py
