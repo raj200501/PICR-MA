@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.analysis.aggregate import build_aggregate_outputs
-from src.analysis.statistics import mean_se
+from src.analysis.statistics import bootstrap_mean_ci, mean_se
 from src.utils.latex_utils import latex_escape, to_pm
 
 
@@ -193,11 +193,42 @@ def _ablation_table(results_dir: str | Path) -> str:
     return "\n".join(lines)
 
 
+def _paired_delta_table(paired_df: pd.DataFrame) -> str:
+    if paired_df.empty:
+        return _empty_table("No paired PICR-MA versus IPPO results available.")
+    lines = [
+        "\\begin{tabular}{llccc}",
+        "\\toprule",
+        "Environment & Quantity & Mean delta & 95\\% bootstrap CI & Direction count \\\\",
+        "\\midrule",
+    ]
+    for env in ["simple_spread_v3", "simple_adversary_v3"]:
+        env_df = paired_df[paired_df["env"] == env]
+        if env_df.empty:
+            continue
+        cross_mean, cross_lo, cross_hi = bootstrap_mean_ci(env_df["delta_crossplay_return"])
+        js_mean, js_lo, js_hi = bootstrap_mean_ci(env_df["delta_permutation_js"])
+        lines.append(
+            f"{latex_escape(_pretty_env(env))} & Cross-play & {cross_mean:.3f} & "
+            f"[{cross_lo:.3f}, {cross_hi:.3f}] & {int((env_df['delta_crossplay_return'] > 0.0).sum())}/{len(env_df)} higher \\\\"
+        )
+        lines.append(
+            f"{latex_escape(_pretty_env(env))} & JS $\\downarrow$ & {js_mean:.3f} & "
+            f"[{js_lo:.3f}, {js_hi:.3f}] & {int((env_df['delta_permutation_js'] < 0.0).sum())}/{len(env_df)} lower \\\\"
+        )
+        lines.append("\\midrule")
+    if lines[-1] == "\\midrule":
+        lines.pop()
+    lines.extend(["\\bottomrule", "\\end{tabular}", ""])
+    return "\n".join(lines)
+
+
 def make_tables(results_dir: str | Path = "results", outdir: str | Path = "latex/tables") -> dict[str, str]:
     aggregates = build_aggregate_outputs(results_dir)
     summary_df = aggregates["summary"]
     crossplay_df = aggregates["crossplay"]
     sensitivity_df = aggregates["sensitivity"]
+    paired_df = aggregates["paired_picr_vs_ippo"]
     outdir = Path(outdir)
 
     tables = {
@@ -206,6 +237,7 @@ def make_tables(results_dir: str | Path = "results", outdir: str | Path = "latex
         "permutation_sensitivity.tex": _sensitivity_table(sensitivity_df),
         "runtime_results.tex": _runtime_table(summary_df),
         "ablation_results.tex": _ablation_table(results_dir),
+        "paired_delta_results.tex": _paired_delta_table(paired_df),
     }
     for name, content in tables.items():
         _write(outdir / name, content)

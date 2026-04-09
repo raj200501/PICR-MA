@@ -1,5 +1,9 @@
 \documentclass{article}
 
+% Official NeurIPS 2026 workshop modes require [sglblindworkshop] or
+% [dblblindworkshop] together with a real \workshoptitle{...}. No official
+% 2026 workshop CFP or accepted-workshop title matching this paper was public
+% on April 8, 2026, so this artifact stays in generic preprint mode.
 \usepackage[preprint]{neurips_2026}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -32,7 +36,7 @@
 \maketitle
 
 \begin{abstract}
-Teammate features in decentralized multi-agent reinforcement learning are often concatenated in an arbitrary fixed order, even when teammates are exchangeable. We study whether reducing this order sensitivity improves zero-shot coordination with unseen partners. Our testbed is \emph{PICR-MA}, a lightweight policy-side regularizer that samples two independent permutations of teammate feature blocks and penalizes the symmetric Kullback--Leibler divergence between the resulting action distributions. \method\ leaves the inference-time policy architecture unchanged and adds only extra training-time forward passes. We evaluate \method\ against IPPO, Deep Sets, and Other-Play on PettingZoo MPE (\texttt{simple\_spread\_v3}, \texttt{simple\_adversary\_v3}) and small matrix-game sanity checks using held-out partner cross-play, permutation sensitivity, and runtime diagnostics. In a 5-seed, 50k-step MPE cohort plus a 20k pilot sweep, \method\ consistently lowers permutation sensitivity and improves held-out-partner coordination over IPPO on \texttt{simple\_adversary\_v3}, but it underperforms IPPO, Deep Sets, and Other-Play on \texttt{simple\_spread\_v3}. Across runs, lower permutation sensitivity is not a reliable proxy for better coordination. The main contribution of the paper is therefore not a new default MARL recipe, but a controlled empirical result: policy-level permutation consistency is a useful bias in some cooperative settings, yet invariance diagnostics alone do not predict zero-shot coordination quality.
+Teammate features in decentralized multi-agent reinforcement learning are often concatenated in an arbitrary fixed order, even when teammates are exchangeable. We study whether reducing this order sensitivity improves zero-shot coordination with unseen partners. Our testbed is \emph{PICR-MA}, a lightweight policy-side regularizer that samples two independent permutations of teammate feature blocks and penalizes the symmetric Kullback--Leibler divergence between the resulting action distributions. \method\ leaves the inference-time policy architecture unchanged and adds only extra training-time forward passes. We evaluate \method\ against IPPO, Deep Sets, and Other-Play on PettingZoo MPE (\texttt{simple\_spread\_v3}, \texttt{simple\_adversary\_v3}) and small matrix-game sanity checks using same-family held-out partner cross-play, permutation sensitivity, and runtime diagnostics. In a 5-seed, 50k-step MPE cohort plus a 20k pilot sweep, \method\ consistently lowers permutation sensitivity. Its mean same-family held-out cross-play is higher than IPPO on \texttt{simple\_adversary\_v3} but lower on \texttt{simple\_spread\_v3}, and matched-seed comparisons show that the coordination effect is much less stable than the diagnostic change. The main contribution of the paper is therefore not a new default MARL recipe, but a controlled empirical result: policy-level permutation consistency is a useful bias in some cooperative settings, yet invariance diagnostics alone do not predict zero-shot coordination quality.
 \end{abstract}
 
 \section{Introduction}
@@ -40,7 +44,7 @@ Zero-shot coordination (ZSC) asks whether an agent trained in self-play can coop
 
 This paper studies a minimal intervention at the policy level. Rather than changing the policy architecture to a set encoder or graph network \citep{zaheer2017deepsets, liu2020pic}, we regularize the policy to produce similar action distributions under different teammate-order views of the same observation. The resulting method, \method, is intentionally simple: during training we apply two independent permutations to teammate feature blocks and penalize their action-distribution disagreement with a symmetric KL loss.
 
-The interesting question is not only whether this penalty reduces a permutation-sensitivity diagnostic. The more important question is whether that diagnostic reduction improves downstream coordination with held-out partners. The answer in the current artifact is mixed. On \texttt{simple\_adversary\_v3}, \method\ improves held-out-partner coordination over IPPO while also lowering permutation sensitivity. On \texttt{simple\_spread\_v3}, it lowers permutation sensitivity but still loses to IPPO, Deep Sets, and Other-Play. This mismatch is the main scientific point of the workshop paper.
+The interesting question is not only whether this penalty reduces a permutation-sensitivity diagnostic. The more important question is whether that diagnostic reduction improves downstream coordination with held-out partners. The answer in the current artifact is mixed. On \texttt{simple\_adversary\_v3}, \method\ raises the cohort-average same-family held-out cross-play score over IPPO while also lowering permutation sensitivity, but the matched-seed gains are inconsistent. On \texttt{simple\_spread\_v3}, it lowers permutation sensitivity and still loses to IPPO, Deep Sets, and Other-Play. This mismatch is the main scientific point of the workshop paper.
 
 \paragraph{Contributions.}
 \begin{itemize}[leftmargin=1.3em]
@@ -88,10 +92,10 @@ We compare four methods under matched training budgets: IPPO, IPPO+\method, IPPO
 The main MPE cohort uses 5 seeds, 50k environment steps per seed, and held-out partner evaluation from independently trained policies sharing the same run tag. A 20k, 3-seed pilot sweep selected $\lambda \in \{0.02, 0.05, 0.10\}$ for \method\ and evaluated teammate dropout at probability $0.1$. The main 50k PICR-MA setting uses $\lambda=0.02$ because it gave the strongest held-out cross-play among the pilot settings, even though larger $\lambda$ values reduced $\JS$ more aggressively.
 
 \paragraph{Evaluation.}
-For each run we record training return, held-out partner cross-play return, permutation sensitivity measured by Jensen--Shannon divergence under teammate-order swaps, and environment-specific diagnostics such as collisions or goal-margin statistics. Cross-play results are produced from saved checkpoints with a partner-pool filter that excludes the evaluated run itself and respects the intended run tag.
+For each run we record training return, held-out partner cross-play return, permutation sensitivity measured by Jensen--Shannon divergence under teammate-order swaps, and environment-specific diagnostics such as collisions or goal-margin statistics. The headline cross-play number in the main table is same-family held-out cross-play, meaning the ego policy is evaluated against independently trained partners from the same method family and run tag; cross-family partners are reported separately in the appendix. Cross-play results are produced from saved checkpoints with a partner-pool filter that excludes the evaluated run itself and respects the intended run tag.
 
 \paragraph{Implementation and compute.}
-All experiments were executed sequentially on a single Apple Silicon laptop under the repo's lean-safe resource profile. The current learner is a small NumPy actor--critic rather than a full PyTorch PPO stack; this keeps the artifact compact and reproducible, but it also limits external ambition and informs the workshop-scale framing of the paper.
+All experiments were executed sequentially on a single Apple Silicon laptop under the repo's lean-safe resource profile. The current learner is a small NumPy actor--critic rather than a full PyTorch PPO stack; this keeps the artifact compact and reproducible, but it also limits external ambition and informs the workshop-scale framing of the paper. IPPO, \method, and Other-Play share the same MLP backbone and optimization budget, so \method's extra cost comes from two additional training-time forward passes rather than a larger inference model; only Deep Sets changes capacity (1606 versus 3302 cooperative parameters on \texttt{simple\_spread\_v3}, and 1350 versus 3238 on \texttt{simple\_adversary\_v3}).
 
 \section{Results}
 \paragraph{Permutation consistency is real.}
@@ -112,7 +116,7 @@ Table~\ref{tab:main-results} and Figure~\ref{fig:perm} show that \method\ does w
 \end{figure*}
 
 \paragraph{Lower sensitivity does not reliably imply better coordination.}
-Figure~\ref{fig:zsc-mismatch} is the core workshop result. On \texttt{simple\_adversary\_v3}, \method\ improves same-family held-out cross-play over IPPO (20.159 $\pm$ 2.043 versus 17.429 $\pm$ 3.770) while reducing $\JS$. On \texttt{simple\_spread\_v3}, however, \method\ lowers $\JS$ but still achieves the weakest held-out cross-play among the four methods ($-27.206 \pm 0.730$ versus $-25.649 \pm 0.271$ for IPPO, $-25.550 \pm 0.489$ for Deep Sets, and $-25.533 \pm 0.566$ for Other-Play). Across seed-level runs, the correlation between $\JS$ and held-out cross-play is weakly positive on both MPE tasks ($r=0.11$ on \texttt{simple\_spread\_v3}, $r=0.14$ on \texttt{simple\_adversary\_v3}), which directly contradicts a strong ``lower $\JS$ means better ZSC'' story.
+Figure~\ref{fig:zsc-mismatch} sharpens this point with matched IPPO$\rightarrow$\method\ seed pairs. On \texttt{simple\_spread\_v3}, \method\ lowers $\JS$ in all five paired comparisons but loses on same-family held-out cross-play in all five; the mean cross-play delta is $-1.557$ with a 95\% bootstrap interval of $[-3.013, -0.651]$. On \texttt{simple\_adversary\_v3}, \method\ lowers $\JS$ in four of five pairs and improves same-family held-out cross-play in three of five; the mean cross-play delta is $+2.731$ with a wide 95\% bootstrap interval of $[-6.141, 12.263]$. The positive adversary result is therefore real at the cohort-average level but much less stable than the diagnostic change, which is exactly the mismatch this paper wants to make concrete.
 
 \begin{figure*}[t]
 \centering
@@ -124,7 +128,7 @@ Figure~\ref{fig:zsc-mismatch} is the core workshop result. On \texttt{simple\_ad
 \centering
 \includegraphics[width=\linewidth]{latex/figures/invariance_coordination_mismatch.pdf}
 \end{minipage}
-\caption{Left: held-out partner ZSC summary for the main cohort. Right: the central workshop diagnostic, plotting seed-level permutation sensitivity against held-out coordination. Reducing teammate-order sensitivity is not enough to guarantee better ZSC.}
+\caption{Left: same-family held-out partner ZSC summary for the main cohort. Right: matched IPPO$\rightarrow$\method\ seed-pair deltas. \method\ moves permutation sensitivity leftward on both tasks, but the associated cross-play shift is positive only inconsistently on \texttt{simple\_adversary\_v3} and negative in every \texttt{simple\_spread\_v3} pair.}
 \label{fig:zsc-mismatch}
 \end{figure*}
 
@@ -136,7 +140,7 @@ Figure~\ref{fig:zsc-mismatch} is the core workshop result. On \texttt{simple\_ad
 \end{figure}
 
 \paragraph{Baselines matter.}
-The baseline story is also mixed. Deep Sets is the strongest invariance baseline but is weak on \texttt{simple\_adversary\_v3} held-out cross-play, suggesting that exact invariance alone can remove useful asymmetries in that environment. Other-Play is slightly stronger than \method\ on \texttt{simple\_adversary\_v3} and clearly stronger on \texttt{simple\_spread\_v3}. The honest takeaway is therefore not that \method\ is a better default than architectural invariance or role randomization, but that it occupies a small simplicity--performance niche: it is lighter than Deep Sets on \texttt{simple\_spread\_v3}, competitive with Other-Play on \texttt{simple\_adversary\_v3}, and simple to bolt onto an existing MLP policy.
+The baseline story is also mixed. Deep Sets is the strongest invariance baseline but is weak on \texttt{simple\_adversary\_v3} held-out cross-play, suggesting that exact invariance alone can remove useful asymmetries in that environment. Other-Play is slightly stronger than \method\ on \texttt{simple\_adversary\_v3} and clearly stronger on \texttt{simple\_spread\_v3}. The appendix cross-family breakdown also shows that \method's positive adversary signal is concentrated in same-family partners rather than a uniform gain across partner families. The honest takeaway is therefore not that \method\ is a better default than architectural invariance or role randomization, but that it occupies a small simplicity--performance niche: it is lighter than Deep Sets on \texttt{simple\_spread\_v3}, competitive with Other-Play on \texttt{simple\_adversary\_v3}, and simple to bolt onto an existing MLP policy.
 
 \paragraph{Ablations and overhead.}
 The 20k pilot ablations in Table~\ref{tab:ablation} show that stronger regularization does not monotonically help. On \texttt{simple\_spread\_v3}, increasing $\lambda$ reduces $\JS$ but steadily worsens held-out cross-play. On \texttt{simple\_adversary\_v3}, the mild setting $\lambda=0.02$ gives the best held-out cross-play in the sweep. Teammate dropout harms both tasks. Runtime overhead is moderate rather than negligible: in the main 50k cohort, \method\ costs $1.62\times$ IPPO on \texttt{simple\_spread\_v3} and $1.33\times$ IPPO on \texttt{simple\_adversary\_v3}, while remaining well below the Deep Sets cost on \texttt{simple\_spread\_v3}.
@@ -158,13 +162,13 @@ The 20k pilot ablations in Table~\ref{tab:ablation} show that stronger regulariz
 \section{Discussion}
 This paper should not be read as evidence that policy-level permutation consistency is a new default recipe for ZSC in MARL. The stronger and more interesting conclusion is narrower: it is possible to reduce order sensitivity substantially with a very small policy-side intervention, but the downstream value of that intervention depends strongly on the environment and the competing inductive biases already present in the baseline.
 
-The contrast between the two MPE tasks suggests a practical hypothesis. In \texttt{simple\_adversary\_v3}, reducing brittle teammate-order dependence appears helpful because the cooperative team benefits from a mild symmetry bias without requiring exact exchangeability. In \texttt{simple\_spread\_v3}, the same bias does not rescue coordination and may suppress distinctions that matter for coverage conventions. This interpretation is consistent with the mismatch plot: invariance diagnostics measure one property of the policy, but they do not summarize the entire coordination problem.
+The contrast between the two MPE tasks suggests a practical hypothesis. In \texttt{simple\_adversary\_v3}, reducing brittle teammate-order dependence appears helpful because the cooperative team benefits from a mild symmetry bias without requiring exact exchangeability. In \texttt{simple\_spread\_v3}, the same bias does not rescue coordination and may suppress distinctions that matter for coverage conventions. The paired-delta analysis makes this concrete: the same intervention moves the diagnostic in the intended direction on both tasks, yet the coordination effect flips sign by environment and does not generalize cleanly across partner families. Invariance diagnostics measure one property of the policy, but they do not summarize the entire coordination problem.
 
 \paragraph{Limitations.}
 The learner is a compact NumPy implementation rather than a standard PyTorch PPO codebase. The main MPE cohort is stronger than the original smoke runs, but it remains a 50k-step laptop-scale study rather than a large benchmark campaign. Matrix games are useful sanity checks, not headline evidence. These limitations are acceptable for a focused workshop submission, but they should prevent stronger claims than the ones made here.
 
 \section{Conclusion}
-\method\ is a clean way to inject permutation consistency into decentralized MARL without changing the inference-time policy. In the current controlled study, that bias reliably lowers teammate-order sensitivity and helps held-out coordination in one MPE setting, but it does not transfer uniformly across environments or beat stronger baselines across the board. For workshop purposes, the more durable contribution is the empirical lesson: lower permutation sensitivity is informative but insufficient as a standalone proxy for zero-shot coordination quality.
+\method\ is a clean way to inject permutation consistency into decentralized MARL without changing the inference-time policy. In the current controlled study, that bias reliably lowers teammate-order sensitivity and raises the mean same-family cross-play score on one MPE task, but the paired-seed gains are unstable and the effect does not transfer uniformly across environments or partner families. For workshop purposes, the more durable contribution is the empirical lesson: lower permutation sensitivity is informative but insufficient as a standalone proxy for zero-shot coordination quality.
 
 \section*{Acknowledgments and Disclosure of Funding}
 This project used only local laptop-scale compute and open-source dependencies. No external experiment tracker, paid API, or cloud compute service was used in the reported results.
@@ -175,7 +179,7 @@ This project used only local laptop-scale compute and open-source dependencies. 
 \appendix
 
 \section{Additional Cross-Play Results}
-Figure~\ref{fig:heatmaps} shows the full cross-play matrices behind the main-paper summary plot. The matrices make two points visible. First, \texttt{simple\_spread\_v3} remains broadly difficult for PICR-MA, not just on the diagonal. Second, on \texttt{simple\_adversary\_v3}, PICR-MA is competitive with IPPO across several held-out partner families, but Other-Play remains slightly stronger overall.
+Figure~\ref{fig:heatmaps} shows the full cross-play matrices behind the main-paper summary plot. The matrices make two points visible. First, \texttt{simple\_spread\_v3} remains broadly difficult for PICR-MA, not just on the diagonal. Second, on \texttt{simple\_adversary\_v3}, the PICR-MA advantage over IPPO is concentrated in same-family partners rather than a uniform cross-family gain, while Other-Play remains slightly stronger overall.
 
 \begin{figure*}[t]
 \centering
@@ -189,6 +193,12 @@ Figure~\ref{fig:heatmaps} shows the full cross-play matrices behind the main-pap
 \centering
 \caption{Held-out partner cross-play split into same-family and cross-family partners.}
 \input{latex/tables/crossplay_results.tex}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Matched-seed PICR-MA versus IPPO deltas. Negative $\Delta$JS is desirable. The table makes the workshop claim explicit: the diagnostic shift is more consistent than the coordination shift.}
+\input{latex/tables/paired_delta_results.tex}
 \end{table}
 
 \begin{table}[h]
@@ -219,6 +229,9 @@ Teammate-block indices are explicitly cached per environment rather than inferre
 
 \paragraph{Hyperparameters.}
 The main reported learner uses hidden size 64, learning rate $3\times 10^{-3}$, discount 0.99, GAE parameter 0.95, PPO clip ratio 0.2, and four update epochs per rollout. The main PICR-MA cohort uses $\lambda=0.02$ and no teammate dropout. Exact commands, profiles, and artifact inventories are listed in \texttt{results/FINAL\_REPORT.md}.
+
+\paragraph{Model capacity and fairness.}
+IPPO, PICR-MA, and Other-Play share the same inference-time MLP and optimizer settings; only Deep Sets changes the encoder capacity. In the main cohort this corresponds to 1606 cooperative parameters for IPPO/PICR-MA/Other-Play versus 3302 for Deep Sets on \texttt{simple\_spread\_v3}, and 1350 versus 3238 on \texttt{simple\_adversary\_v3}. PICR-MA's extra runtime therefore comes from training-time consistency passes rather than a larger deployed policy.
 
 \paragraph{Assets and licenses.}
 The experiments rely on PettingZoo 1.24.3, Gymnasium 1.2.3, and SuperSuit 3.10.0. Local package metadata reports MIT licenses for these core environment assets. All reported figures and tables are generated from files stored under \texttt{results/}.

@@ -8,7 +8,7 @@ import pandas as pd
 from matplotlib.patches import FancyArrowPatch, Rectangle
 
 from src.analysis.aggregate import build_aggregate_outputs
-from src.analysis.statistics import mean_se
+from src.analysis.statistics import bootstrap_mean_ci, mean_se
 
 
 METHOD_ORDER = ["ippo", "picr_ma", "deepsets", "otherplay"]
@@ -230,21 +230,21 @@ def permutation_plot(sensitivity_df: pd.DataFrame, outdir: str | Path) -> str:
     return str(path)
 
 
-def invariance_coordination_mismatch(summary_df: pd.DataFrame, outdir: str | Path) -> str:
+def invariance_coordination_mismatch(paired_df: pd.DataFrame, outdir: str | Path) -> str:
     _configure_style()
-    if summary_df.empty or "crossplay_return" not in summary_df or "permutation_js" not in summary_df:
+    if paired_df.empty:
         fig, ax = plt.subplots(figsize=(6, 3))
-        ax.text(0.5, 0.5, "No invariance/coordination data available", ha="center", va="center")
+        ax.text(0.5, 0.5, "No paired IPPO/PICR-MA comparison available", ha="center", va="center")
         ax.axis("off")
         path = Path(outdir) / "invariance_coordination_mismatch.pdf"
         _save(fig, path)
         return str(path)
 
-    envs = [env for env in ["simple_spread_v3", "simple_adversary_v3"] if env in set(summary_df["env"])]
-    plot_df = summary_df[summary_df["env"].isin(envs)].dropna(subset=["crossplay_return", "permutation_js"])
+    envs = [env for env in ["simple_spread_v3", "simple_adversary_v3"] if env in set(paired_df["env"])]
+    plot_df = paired_df[paired_df["env"].isin(envs)].copy()
     if plot_df.empty:
         fig, ax = plt.subplots(figsize=(6, 3))
-        ax.text(0.5, 0.5, "No invariance/coordination data available", ha="center", va="center")
+        ax.text(0.5, 0.5, "No paired IPPO/PICR-MA comparison available", ha="center", va="center")
         ax.axis("off")
         path = Path(outdir) / "invariance_coordination_mismatch.pdf"
         _save(fig, path)
@@ -253,48 +253,62 @@ def invariance_coordination_mismatch(summary_df: pd.DataFrame, outdir: str | Pat
     fig, axes = plt.subplots(1, len(envs), figsize=(5.0 * len(envs), 3.8), sharey=False)
     if len(envs) == 1:
         axes = [axes]
-
-    legend_handles = []
     for ax, env in zip(axes, envs):
         env_df = plot_df[plot_df["env"] == env]
-        for method in METHOD_ORDER:
-            method_df = env_df[env_df["method"] == method]
-            if method_df.empty:
-                continue
-            handle = ax.scatter(
-                method_df["permutation_js"],
-                method_df["crossplay_return"],
-                color=METHOD_COLORS[method],
-                alpha=0.55,
-                s=28,
-                linewidth=0.5,
-                edgecolors="white",
-                label=METHOD_LABELS[method],
+        ax.axvline(0.0, color="#666666", linestyle="--", linewidth=1.0)
+        ax.axhline(0.0, color="#666666", linestyle="--", linewidth=1.0)
+        ax.scatter(
+            env_df["delta_permutation_js"],
+            env_df["delta_crossplay_return"],
+            color=METHOD_COLORS["picr_ma"],
+            alpha=0.8,
+            s=48,
+            linewidth=0.6,
+            edgecolors="white",
+            zorder=3,
+        )
+        for _, row in env_df.iterrows():
+            ax.annotate(
+                f"s{int(row['seed'])}",
+                (row["delta_permutation_js"], row["delta_crossplay_return"]),
+                xytext=(4, 4),
+                textcoords="offset points",
+                fontsize=7,
+                color="#333333",
             )
-            ax.scatter(
-                method_df["permutation_js"].mean(),
-                method_df["crossplay_return"].mean(),
-                color=METHOD_COLORS[method],
-                edgecolors="black",
-                linewidth=0.8,
-                s=90,
-                marker="D",
-                zorder=4,
-            )
-            if env == envs[0]:
-                legend_handles.append(handle)
-        corr = np.nan
-        if len(env_df) >= 2 and env_df["permutation_js"].std(ddof=0) > 0 and env_df["crossplay_return"].std(ddof=0) > 0:
-            corr = float(np.corrcoef(env_df["permutation_js"], env_df["crossplay_return"])[0, 1])
-        corr_text = f"r={corr:.2f}" if not np.isnan(corr) else "r=n/a"
-        ax.set_title(f"{env.replace('_v3', '').replace('_', ' ')} ({corr_text})")
-        ax.set_xlabel("Permutation sensitivity (JS)")
-        ax.set_ylabel("Held-out partner cross-play return")
+        mean_js, js_lo, js_hi = bootstrap_mean_ci(env_df["delta_permutation_js"])
+        mean_cross, cross_lo, cross_hi = bootstrap_mean_ci(env_df["delta_crossplay_return"])
+        ax.errorbar(
+            [mean_js],
+            [mean_cross],
+            xerr=[[mean_js - js_lo], [js_hi - mean_js]],
+            yerr=[[mean_cross - cross_lo], [cross_hi - mean_cross]],
+            fmt="D",
+            color="#111111",
+            markersize=7,
+            markerfacecolor="#F58518",
+            markeredgecolor="#111111",
+            capsize=3,
+            zorder=4,
+        )
+        js_lower = int((env_df["delta_permutation_js"] < 0.0).sum())
+        cross_up = int((env_df["delta_crossplay_return"] > 0.0).sum())
+        ax.text(
+            0.03,
+            0.97,
+            f"JS lower: {js_lower}/{len(env_df)}\nCross-play up: {cross_up}/{len(env_df)}",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=8,
+            bbox={"facecolor": "white", "edgecolor": "#DDDDDD", "boxstyle": "round,pad=0.25"},
+        )
+        ax.set_title(env.replace("_v3", "").replace("_", " "))
+        ax.set_xlabel("$\\Delta$ permutation sensitivity (PICR-MA $-$ IPPO)")
+        ax.set_ylabel("$\\Delta$ same-family cross-play (PICR-MA $-$ IPPO)")
         ax.grid(alpha=0.2, linewidth=0.5)
 
-    if legend_handles:
-        fig.legend(legend_handles, [h.get_label() for h in legend_handles], loc="upper center", ncol=len(legend_handles), frameon=False)
-    fig.suptitle("Lower permutation sensitivity does not reliably predict better held-out coordination", y=1.03)
+    fig.suptitle("PICR-MA shifts order sensitivity in a consistent direction, but the cross-play effect flips by environment", y=1.03)
     path = Path(outdir) / "invariance_coordination_mismatch.pdf"
     _save(fig, path)
     return str(path)
@@ -358,6 +372,7 @@ def make_publication_plots(results_dir: str | Path = "results", outdir: str | Pa
     train_df = aggregates["train"]
     crossplay_df = aggregates["crossplay"]
     sensitivity_df = aggregates["sensitivity"]
+    paired_df = aggregates["paired_picr_vs_ippo"]
     outdir = Path(outdir)
     paths = [
         method_overview_figure(outdir),
@@ -365,7 +380,7 @@ def make_publication_plots(results_dir: str | Path = "results", outdir: str | Pa
         zsc_summary(summary_df, outdir),
         crossplay_heatmaps(crossplay_df, outdir),
         permutation_plot(sensitivity_df, outdir),
-        invariance_coordination_mismatch(summary_df, outdir),
+        invariance_coordination_mismatch(paired_df, outdir),
         runtime_overhead(summary_df, outdir),
         matrix_summary(summary_df, outdir),
     ]
