@@ -80,20 +80,30 @@ def evaluate_pair(ego_bundle: dict, partner_bundle: dict, episodes: int = 8) -> 
     }
 
 
-def evaluate_run(run_dir: str | Path, results_dir: str | Path = "results") -> list[dict]:
+def evaluate_run(
+    run_dir: str | Path,
+    results_dir: str | Path = "results",
+    partner_run_tag: str | None = None,
+    episodes: int = 8,
+) -> list[dict]:
     run_path = Path(run_dir)
     summary = read_json(run_path / "summary.json")
     env_name = summary["env"]
     ego_bundle = load_policy_bundle(run_path, slicing=build_env(env_name, seed=summary["seed"])[1].teammate_slicing)
-
-    partner_rows = [row for row in load_run_summaries(results_dir) if row["env"] == env_name and row["run_id"] != summary["run_id"]]
+    pool_tag = partner_run_tag or summary.get("run_tag")
+    partner_rows = partner_pool(
+        results_dir=results_dir,
+        env=env_name,
+        exclude_run_id=summary["run_id"],
+        run_tag=pool_tag,
+    )
     rows = []
     for partner_summary in partner_rows:
         partner_bundle = load_policy_bundle(
             partner_summary["run_dir"],
             slicing=build_env(env_name, seed=partner_summary["seed"])[1].teammate_slicing,
         )
-        metrics = evaluate_pair(ego_bundle, partner_bundle)
+        metrics = evaluate_pair(ego_bundle, partner_bundle, episodes=episodes)
         rows.append(
             {
                 "ego_run_id": summary["run_id"],
@@ -111,6 +121,8 @@ def evaluate_run(run_dir: str | Path, results_dir: str | Path = "results") -> li
 
     to_csv_gz(rows, run_path / "eval_crossplay.csv.gz")
     same_method_rows = [row for row in rows if row["partner_method"] == summary["method"]]
+    summary["crossplay_pool_run_tag"] = pool_tag
+    summary["crossplay_partner_count"] = len(rows)
     summary["crossplay_return"] = (
         float(np.mean([row["crossplay_return"] for row in same_method_rows]))
         if same_method_rows
@@ -124,13 +136,25 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", default=None)
     parser.add_argument("--results-dir", default="results")
+    parser.add_argument("--partner-run-tag", default=None)
+    parser.add_argument("--episodes", type=int, default=8)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
     if args.run_dir:
-        evaluate_run(args.run_dir, args.results_dir)
+        evaluate_run(
+            args.run_dir,
+            args.results_dir,
+            partner_run_tag=args.partner_run_tag,
+            episodes=args.episodes,
+        )
     else:
         for summary in load_run_summaries(args.results_dir):
-            evaluate_run(summary["run_dir"], args.results_dir)
+            evaluate_run(
+                summary["run_dir"],
+                args.results_dir,
+                partner_run_tag=args.partner_run_tag,
+                episodes=args.episodes,
+            )

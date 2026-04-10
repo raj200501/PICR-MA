@@ -19,5 +19,8 @@ def test_analysis_outputs(tmp_path, monkeypatch):
     make_tables(tmp_path / "results", tmp_path / "latex" / "tables")
     make_publication_plots(tmp_path / "results", tmp_path / "latex" / "figures")
     assert (tmp_path / "results" / "aggregate" / "final_metrics_for_paper.json").exists()
+    assert (tmp_path / "results" / "aggregate" / "paired_picr_vs_ippo.csv").exists()
+    assert (tmp_path / "results" / "aggregate" / "implementation_summary.csv").exists()
     assert (tmp_path / "latex" / "tables" / "main_results.tex").exists()
+    assert (tmp_path / "latex" / "tables" / "paired_delta_results.tex").exists()
     assert (tmp_path / "latex" / "figures" / "method_overview.pdf").exists()

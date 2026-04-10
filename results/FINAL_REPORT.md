@@ -3,71 +3,91 @@
 ## Active profile
 
 - `PROFILE_LEAN_SAFE`
+- branch: `icml_hardening_pass`
+- main approval: blocked
 
-## What was implemented
+## What was implemented in the hardening pass
 
-- Explicit observation slicing with manual teammate-block definitions for MPE.
-- PICR-MA symmetric KL regularizer with dual permuted views and optional teammate dropout hook.
-- Shared-parameter NumPy on-policy actor--critic baselines for `ippo`, `picr_ma`, `deepsets`, and `otherplay`.
-- Tiny 3-agent matrix coordination and stag-hunt environments.
-- PettingZoo MPE training/evaluation wrappers for `simple_spread_v3` and `simple_adversary_v3`.
-- Held-out partner cross-play evaluation from saved checkpoints.
-- Permutation-sensitivity evaluation via Jensen--Shannon divergence.
-- Aggregate CSV/JSON exports, publication-style PDF plots, LaTeX table fragments, and manuscript population.
+- Cohort-scoped partner-pool evaluation to remove cross-play contamination.
+- Episode-consistent Other-Play teammate-order randomization.
+- 20k pilot cohort across all main baselines on both MPE tasks.
+- 20k lambda sweep for PICR-MA over `0.02`, `0.05`, `0.10`.
+- 20k teammate-dropout ablation at dropout probability `0.10`.
+- 50k main MPE cohort with 5 seeds per method and tuned PICR-MA (`lambda=0.02`).
+- Updated manuscript text and regenerated figures/tables from the hardened cohort.
+- Reviewer-style audit, self-review, and go/no-go documents.
 
 ## What actually ran
 
-- Preflight and install check under the repo-local `.venv`
-- Smoke runs
-- Stage 0 runs
-- Stage 1 core matrix:
-  - environments: `matrix_coordination`, `matrix_staghunt`, `simple_spread_v3`, `simple_adversary_v3`
-  - methods: `ippo`, `picr_ma`, `deepsets`, `otherplay`
-  - seeds: 2
-  - total Stage 1 runs: 32
-- Cross-play evaluation for all Stage 1 runs
-- Plot, table, artifact-inventory, and manuscript population passes
+- Re-evaluation of all tracked `stage1` runs with the fixed partner-pool logic.
+- `hardpilot20k`: 24 runs
+- `lambda20k`: 18 runs
+- `drop20k_p010`: 6 runs
+- `hardmain50k`: 40 runs
+- Full held-out cross-play evaluation for all of the above cohorts.
+- Regenerated LaTeX tables and figures from the 50k main cohort.
+- Full test suite: `14 passed`
 
 ## What was skipped
 
-- Stage 2 lambda sweep
-- Stage 2 teammate-dropout ablation
-- DQN baseline
-- Automated LaTeX compilation
+- Any merge or fast-forward into `main`
+- Any push to a remote
+- A PyTorch port of the learner
+- Larger-than-50k full-baseline MPE sweeps
+- Full appendix build-out and LaTeX compilation
 
 ## Why anything was skipped
 
-- Stage 2 was deferred to keep the run set within the lean-safe budget and because Stage 1 already completed end-to-end.
-- DQN was unnecessary for completing the main PICR-MA package under current constraints.
-- `pdflatex` was not installed locally.
+- `main` is blocked because the project does not pass the internal ICML bar; see `results/ICML_GO_NO_GO.md`.
+- A PyTorch port would have been a larger rewrite than was justified before resolving the empirical question.
+- The 50k cohort already showed a mixed claim; larger sweeps were unlikely to rescue the project enough for a PASS under the remaining time and hardware budget.
+- `pdflatex` was not available locally.
 
 ## Runtime and disk
 
-- Total recorded runtime across saved runs: about `54.896` seconds
-- Stage 1 recorded runtime: about `51.461` seconds
-- Generated `results/` footprint: about `4.0M`
-- Generated `latex/` footprint: about `128K`
-- Repo-local `.venv` footprint: about `241M`
+- Recorded training runtime from the hardening cohorts:
+  - `hardpilot20k`: `777.489` s
+  - `lambda20k`: `1017.618` s
+  - `drop20k_p010`: `100.225` s
+  - `hardmain50k`: `1655.531` s
+- Total recorded training runtime for the hardening cohorts: `3550.863` s
+- Current `results/` footprint: about `31M`
+- Current `latex/` footprint: about `128K`
+- Free disk at end of pass: about `4.8 GiB`
 
 ## Exact reproduction commands
 
 ```bash
-make install
-make preflight
-./.venv/bin/python scripts/install_check.py
-./.venv/bin/python scripts/smoke_test.py
-./.venv/bin/python scripts/run_stage0.py
-./.venv/bin/python scripts/run_stage1.py
-make plots
-make tables
-make paper
-make clean_artifacts
-make report
+PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/pytest -q
+
+for env in simple_spread_v3 simple_adversary_v3; do
+  for method in ippo picr_ma deepsets otherplay; do
+    for seed in 0 1 2 3 4; do
+      if [ "$method" = "picr_ma" ]; then
+        PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/python scripts/train.py \
+          --env "$env" --method "$method" --seed "$seed" --steps 50000 --tag hardmain50k \
+          --max-cycles 25 --picr-lambda 0.02 --eval-episodes 16
+      else
+        PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/python scripts/train.py \
+          --env "$env" --method "$method" --seed "$seed" --steps 50000 --tag hardmain50k \
+          --max-cycles 25 --eval-episodes 16
+      fi
+    done
+  done
+done
+
+for run in $(find results -maxdepth 1 -type d -name 'run_hardmain50k_*' | sort); do
+  PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/python scripts/evaluate.py \
+    --run-dir "$run" --results-dir results --partner-run-tag hardmain50k --episodes 16
+done
+
+PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/python scripts/make_tables.py
+PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp ./.venv/bin/python scripts/make_plots.py
 ```
 
 ## What remains for human polishing
 
-- Review the Stage 1 figures/tables and decide whether to keep the current lean-safe scope or run a Stage 2 ablation sweep.
+- Decide whether to invest in a PyTorch PPO port and substantially larger full-baseline runs.
+- Build a real appendix package if the project is revived.
 - Install `pdflatex` and compile the paper locally.
-- Tighten manuscript prose around the strongest and weakest environment-specific outcomes if preparing for submission.
-- Optionally replace the NumPy learner with a PyTorch implementation once a stable local `torch` install is available.
+- Revisit the method claim entirely if future work still shows mixed environment dependence.

@@ -8,6 +8,7 @@ import pandas as pd
 from matplotlib.patches import FancyArrowPatch, Rectangle
 
 from src.analysis.aggregate import build_aggregate_outputs
+from src.analysis.statistics import bootstrap_mean_ci, mean_se
 
 
 METHOD_ORDER = ["ippo", "picr_ma", "deepsets", "otherplay"]
@@ -150,6 +151,44 @@ def crossplay_heatmaps(crossplay_df: pd.DataFrame, outdir: str | Path) -> str:
     return str(path)
 
 
+def zsc_summary(summary_df: pd.DataFrame, outdir: str | Path) -> str:
+    _configure_style()
+    envs = [env for env in ["simple_spread_v3", "simple_adversary_v3"] if env in set(summary_df.get("env", []))]
+    if not envs or summary_df.empty:
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.text(0.5, 0.5, "No zero-shot coordination summary available", ha="center", va="center")
+        ax.axis("off")
+        path = Path(outdir) / "zero_shot_crossplay_summary.pdf"
+        _save(fig, path)
+        return str(path)
+
+    fig, axes = plt.subplots(1, len(envs), figsize=(4.8 * len(envs), 3.8), sharey=False)
+    if len(envs) == 1:
+        axes = [axes]
+    for ax, env in zip(axes, envs):
+        env_df = summary_df[summary_df["env"] == env]
+        methods = [method for method in METHOD_ORDER if method in set(env_df["method"])]
+        means = []
+        ses = []
+        for method in methods:
+            method_df = env_df[env_df["method"] == method]["crossplay_return"].dropna()
+            mean, se = mean_se(method_df)
+            means.append(mean)
+            ses.append(se)
+        x = np.arange(len(methods))
+        ax.errorbar(x, means, yerr=ses, fmt="o", color="#222222", ecolor="#222222", elinewidth=1.1, capsize=3)
+        for idx, method in enumerate(methods):
+            ax.scatter(x[idx], means[idx], color=METHOD_COLORS[method], s=70, zorder=3)
+        ax.set_xticks(x, [METHOD_LABELS[method] for method in methods], rotation=20)
+        ax.set_ylabel("Held-out partner cross-play return")
+        ax.set_title(env.replace("_v3", "").replace("_", " "))
+        ax.grid(axis="y", alpha=0.2, linewidth=0.5)
+    fig.suptitle("Held-out partner zero-shot coordination summary", y=1.02)
+    path = Path(outdir) / "zero_shot_crossplay_summary.pdf"
+    _save(fig, path)
+    return str(path)
+
+
 def permutation_plot(sensitivity_df: pd.DataFrame, outdir: str | Path) -> str:
     _configure_style()
     envs = sorted(sensitivity_df["env"].unique()) if not sensitivity_df.empty else []
@@ -187,6 +226,90 @@ def permutation_plot(sensitivity_df: pd.DataFrame, outdir: str | Path) -> str:
         ax.tick_params(axis="x", rotation=25)
     fig.suptitle("Permutation sensitivity under teammate-order swaps", y=1.02)
     path = Path(outdir) / "permutation_sensitivity_results.pdf"
+    _save(fig, path)
+    return str(path)
+
+
+def invariance_coordination_mismatch(paired_df: pd.DataFrame, outdir: str | Path) -> str:
+    _configure_style()
+    if paired_df.empty:
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.text(0.5, 0.5, "No paired IPPO/PICR-MA comparison available", ha="center", va="center")
+        ax.axis("off")
+        path = Path(outdir) / "invariance_coordination_mismatch.pdf"
+        _save(fig, path)
+        return str(path)
+
+    envs = [env for env in ["simple_spread_v3", "simple_adversary_v3"] if env in set(paired_df["env"])]
+    plot_df = paired_df[paired_df["env"].isin(envs)].copy()
+    if plot_df.empty:
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.text(0.5, 0.5, "No paired IPPO/PICR-MA comparison available", ha="center", va="center")
+        ax.axis("off")
+        path = Path(outdir) / "invariance_coordination_mismatch.pdf"
+        _save(fig, path)
+        return str(path)
+
+    fig, axes = plt.subplots(1, len(envs), figsize=(5.0 * len(envs), 3.8), sharey=False)
+    if len(envs) == 1:
+        axes = [axes]
+    for ax, env in zip(axes, envs):
+        env_df = plot_df[plot_df["env"] == env]
+        ax.axvline(0.0, color="#666666", linestyle="--", linewidth=1.0)
+        ax.axhline(0.0, color="#666666", linestyle="--", linewidth=1.0)
+        ax.scatter(
+            env_df["delta_permutation_js"],
+            env_df["delta_crossplay_return"],
+            color=METHOD_COLORS["picr_ma"],
+            alpha=0.8,
+            s=48,
+            linewidth=0.6,
+            edgecolors="white",
+            zorder=3,
+        )
+        for _, row in env_df.iterrows():
+            ax.annotate(
+                f"s{int(row['seed'])}",
+                (row["delta_permutation_js"], row["delta_crossplay_return"]),
+                xytext=(4, 4),
+                textcoords="offset points",
+                fontsize=7,
+                color="#333333",
+            )
+        mean_js, js_lo, js_hi = bootstrap_mean_ci(env_df["delta_permutation_js"])
+        mean_cross, cross_lo, cross_hi = bootstrap_mean_ci(env_df["delta_crossplay_return"])
+        ax.errorbar(
+            [mean_js],
+            [mean_cross],
+            xerr=[[mean_js - js_lo], [js_hi - mean_js]],
+            yerr=[[mean_cross - cross_lo], [cross_hi - mean_cross]],
+            fmt="D",
+            color="#111111",
+            markersize=7,
+            markerfacecolor="#F58518",
+            markeredgecolor="#111111",
+            capsize=3,
+            zorder=4,
+        )
+        js_lower = int((env_df["delta_permutation_js"] < 0.0).sum())
+        cross_up = int((env_df["delta_crossplay_return"] > 0.0).sum())
+        ax.text(
+            0.03,
+            0.97,
+            f"JS lower: {js_lower}/{len(env_df)}\nCross-play up: {cross_up}/{len(env_df)}",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=8,
+            bbox={"facecolor": "white", "edgecolor": "#DDDDDD", "boxstyle": "round,pad=0.25"},
+        )
+        ax.set_title(env.replace("_v3", "").replace("_", " "))
+        ax.set_xlabel("$\\Delta$ permutation sensitivity (PICR-MA $-$ IPPO)")
+        ax.set_ylabel("$\\Delta$ same-family cross-play (PICR-MA $-$ IPPO)")
+        ax.grid(alpha=0.2, linewidth=0.5)
+
+    fig.suptitle("PICR-MA shifts order sensitivity in a consistent direction, but the cross-play effect flips by environment", y=1.03)
+    path = Path(outdir) / "invariance_coordination_mismatch.pdf"
     _save(fig, path)
     return str(path)
 
@@ -249,12 +372,15 @@ def make_publication_plots(results_dir: str | Path = "results", outdir: str | Pa
     train_df = aggregates["train"]
     crossplay_df = aggregates["crossplay"]
     sensitivity_df = aggregates["sensitivity"]
+    paired_df = aggregates["paired_picr_vs_ippo"]
     outdir = Path(outdir)
     paths = [
         method_overview_figure(outdir),
         learning_curves(train_df, outdir),
+        zsc_summary(summary_df, outdir),
         crossplay_heatmaps(crossplay_df, outdir),
         permutation_plot(sensitivity_df, outdir),
+        invariance_coordination_mismatch(paired_df, outdir),
         runtime_overhead(summary_df, outdir),
         matrix_summary(summary_df, outdir),
     ]

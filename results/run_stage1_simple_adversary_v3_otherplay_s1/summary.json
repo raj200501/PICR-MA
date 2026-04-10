@@ -24,5 +24,7 @@
   "in_team_eval_return": 18.551719268481886,
   "collision_mean": 0.0,
   "goal_margin_mean": 0.7420687707392755,
-  "success_mean": 0.0
+  "success_mean": 0.0,
+  "crossplay_pool_run_tag": "stage1",
+  "crossplay_partner_count": 7
 }

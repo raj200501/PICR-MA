@@ -25,7 +25,7 @@ from src.envs.mpe_wrappers import (
     simple_spread_collisions,
 )
 from src.eval.permutation_sensitivity import sensitivity
-from src.methods.otherplay import permute_observation_batch
+from src.methods.otherplay import permute_observation_batch, teammate_permutation
 from src.models.actor_critic import build_actor_critic
 from src.utils.config import dump_yaml
 from src.utils.io_utils import ensure_dir, write_json, write_text
@@ -81,6 +81,10 @@ def package_versions() -> dict[str, str]:
     return versions
 
 
+def parameter_count(model) -> int:
+    return int(sum(value.size for value in model.parameters().values()))
+
+
 def make_run_id(config: ExperimentConfig) -> str:
     return f"run_{config.run_tag}_{config.env}_{config.method}_s{config.seed}"
 
@@ -114,9 +118,10 @@ def preprocess_observations(
     observations: np.ndarray,
     slicing,
     rng: np.random.Generator,
+    permutation: tuple[int, ...] | None = None,
 ) -> np.ndarray:
     if method == "otherplay" and slicing.n_teammates > 1:
-        return permute_observation_batch(observations, slicing, rng)
+        return permute_observation_batch(observations, slicing, rng, permutation=permutation)
     return np.asarray(observations, dtype=np.float32)
 
 
@@ -231,6 +236,7 @@ def run_experiment(
     max_cycles: int | None = None,
     picr_lambda: float = 0.2,
     teammate_dropout_p: float = 0.0,
+    eval_episodes: int = 8,
 ) -> str:
     profile = active_profile()
     config = ExperimentConfig(
@@ -242,6 +248,7 @@ def run_experiment(
         max_cycles=max_cycles or (1 if env.startswith("matrix_") else 25),
         picr_lambda=picr_lambda,
         teammate_dropout_p=teammate_dropout_p,
+        eval_episodes=eval_episodes,
         run_tag=tag,
     )
     run_id = make_run_id(config)
@@ -291,10 +298,19 @@ def run_experiment(
         observations, _ = env_instance.reset(seed=config.seed + episode_index)
         episode_return = 0.0
         episode_success = []
+        episode_teammate_permutation = None
+        if method == "otherplay" and spec.teammate_slicing.n_teammates > 1:
+            episode_teammate_permutation = teammate_permutation(rng, spec.teammate_slicing.n_teammates)
         done = False
         while not done and env_steps < config.total_env_steps:
             coop_raw = np.stack([observations[agent] for agent in spec.cooperative_agents], axis=0)
-            coop_policy_obs = preprocess_observations(method, coop_raw, spec.teammate_slicing, rng)
+            coop_policy_obs = preprocess_observations(
+                method,
+                coop_raw,
+                spec.teammate_slicing,
+                rng,
+                permutation=episode_teammate_permutation,
+            )
             coop_actions, coop_log_probs, coop_values = cooperative_policy.act(coop_policy_obs, rng)
             action_dict = {
                 agent: int(action)
@@ -428,6 +444,11 @@ def run_experiment(
         "artifact_footprint_mb": artifact_mb,
         "package_versions": package_versions(),
         "git_commit": safe_git_commit(),
+        "picr_lambda": config.picr_lambda if method == "picr_ma" else 0.0,
+        "teammate_dropout_p": config.teammate_dropout_p,
+        "eval_episodes": config.eval_episodes,
+        "cooperative_param_count": parameter_count(cooperative_policy),
+        "adversary_param_count": parameter_count(adversary_policy) if adversary_policy is not None else 0,
         "train_return": float(np.mean([row["episodic_return"] for row in train_rows[-10:]])),
         "crossplay_return": None,
         "permutation_js": permutation_mean,
@@ -465,6 +486,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-cycles", type=int, default=None)
     parser.add_argument("--picr-lambda", type=float, default=0.2)
     parser.add_argument("--teammate-dropout-p", type=float, default=0.0)
+    parser.add_argument("--eval-episodes", type=int, default=8)
     return parser.parse_args()
 
 
@@ -480,4 +502,5 @@ if __name__ == "__main__":
         max_cycles=args.max_cycles,
         picr_lambda=args.picr_lambda,
         teammate_dropout_p=args.teammate_dropout_p,
+        eval_episodes=args.eval_episodes,
     )
