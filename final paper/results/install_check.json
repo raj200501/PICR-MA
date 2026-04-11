@@ -1,0 +1,12 @@
+{
+  "python_executable": "/Users/rajkashikar/PICR-MA/.venv/bin/python",
+  "pytest": "9.0.2",
+  "numpy": "2.4.4",
+  "pandas": "3.0.2",
+  "matplotlib": "3.10.8",
+  "torch": "missing:ModuleNotFoundError",
+  "pettingzoo": "1.24.3",
+  "supersuit": "3.10.0",
+  "gymnasium": "1.2.3",
+  "pygame": "2.6.1"
+}

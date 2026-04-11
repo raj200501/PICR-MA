@@ -1,0 +1,2 @@
+envs: [matrix_coordination, matrix_staghunt]
+max_steps: 5000

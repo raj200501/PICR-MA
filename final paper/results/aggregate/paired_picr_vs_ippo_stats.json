@@ -1,0 +1,32 @@
+{
+  "simple_adversary_v3": {
+    "paired_seed_count": 5,
+    "crossplay": {
+      "mean_delta": 3.1629271507263184,
+      "ci_low": -6.021449089050293,
+      "ci_high": 13.211082458496094,
+      "picr_better_count": 3
+    },
+    "permutation_js": {
+      "mean_delta": -0.0049460409209132195,
+      "ci_low": -0.014975987374782562,
+      "ci_high": 0.002184932352975011,
+      "picr_lower_count": 4
+    }
+  },
+  "simple_spread_v3": {
+    "paired_seed_count": 5,
+    "crossplay": {
+      "mean_delta": -1.3095275163650513,
+      "ci_low": -2.14473295211792,
+      "ci_high": -0.7794283032417297,
+      "picr_better_count": 0
+    },
+    "permutation_js": {
+      "mean_delta": -0.013520617969334126,
+      "ci_low": -0.0271295215934515,
+      "ci_high": -0.0037379483692348003,
+      "picr_lower_count": 5
+    }
+  }
+}

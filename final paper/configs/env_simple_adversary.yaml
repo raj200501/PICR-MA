@@ -1,0 +1,3 @@
+env: simple_adversary_v3
+n_good_agents: 3
+max_steps: 200000

@@ -1,0 +1,28 @@
+{
+  "run_id": "run_stage0_matrix_coordination_ippo_s0",
+  "run_tag": "stage0",
+  "env": "matrix_coordination",
+  "method": "ippo",
+  "seed": 0,
+  "profile": "PROFILE_LEAN_SAFE",
+  "training_steps": 120,
+  "wall_clock_runtime_sec": 0.51,
+  "artifact_footprint_mb": 0.01,
+  "package_versions": {
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "matplotlib": "3.10.8",
+    "pettingzoo": "1.24.3",
+    "gymnasium": "1.2.3",
+    "supersuit": "3.10.0",
+    "pygame": "2.6.1"
+  },
+  "git_commit": "5ab811341352e2e6a07897da2fd5330ec4436e67",
+  "train_return": 0.7333332,
+  "crossplay_return": 0.6666666716337204,
+  "permutation_js": 0.009540338174823481,
+  "in_team_eval_return": 1.0,
+  "collision_mean": 0.0,
+  "goal_margin_mean": 0.0,
+  "success_mean": 1.0
+}
