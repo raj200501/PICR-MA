@@ -2,9 +2,9 @@
   "simple_adversary_v3": {
     "paired_seed_count": 5,
     "crossplay": {
-      "mean_delta": 2.7306551933288574,
-      "ci_low": -6.141049861907959,
-      "ci_high": 12.262628555297852,
+      "mean_delta": 2.417570114135742,
+      "ci_low": -6.454134941101074,
+      "ci_high": 11.77472972869873,
       "picr_better_count": 3
     },
     "permutation_js": {

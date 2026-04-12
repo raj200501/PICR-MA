@@ -24,7 +24,7 @@
   "cooperative_param_count": 1350,
   "adversary_param_count": 1222,
   "train_return": 13.3849279,
-  "crossplay_return": 19.100494506731422,
+  "crossplay_return": 17.535068575146674,
   "permutation_js": 0.0030029879854487603,
   "in_team_eval_return": 9.83822721529648,
   "collision_mean": 0.0,
