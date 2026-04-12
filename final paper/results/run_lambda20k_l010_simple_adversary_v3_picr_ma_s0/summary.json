@@ -1,0 +1,30 @@
+{
+  "run_id": "run_lambda20k_l010_simple_adversary_v3_picr_ma_s0",
+  "run_tag": "lambda20k_l010",
+  "env": "simple_adversary_v3",
+  "method": "picr_ma",
+  "seed": 0,
+  "profile": "PROFILE_LEAN_SAFE",
+  "training_steps": 20000,
+  "wall_clock_runtime_sec": 48.11,
+  "artifact_footprint_mb": 0.0463,
+  "package_versions": {
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "matplotlib": "3.10.8",
+    "pettingzoo": "1.24.3",
+    "gymnasium": "1.2.3",
+    "supersuit": "3.10.0",
+    "pygame": "2.6.1"
+  },
+  "git_commit": "7005c17b62c9a51c51ea6f3561ae128ef20b3366",
+  "train_return": 2.8988854,
+  "crossplay_return": 25.44227895115033,
+  "permutation_js": 0.009392665264719394,
+  "in_team_eval_return": 0.12510767655736177,
+  "collision_mean": 0.0,
+  "goal_margin_mean": 0.005004307062294453,
+  "success_mean": 0.0,
+  "crossplay_pool_run_tag": "lambda20k_l010",
+  "crossplay_partner_count": 2
+}

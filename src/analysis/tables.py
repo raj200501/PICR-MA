@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.analysis.aggregate import build_aggregate_outputs
@@ -40,17 +41,25 @@ def _pretty_method(method: str) -> str:
     return mapping.get(method, method)
 
 
+def _maybe_bold(text: str, condition: bool) -> str:
+    return f"\\textbf{{{text}}}" if condition else text
+
+
 def _main_results_table(summary_df: pd.DataFrame) -> str:
     if summary_df.empty:
         return _empty_table("No main results available.")
     lines = [
         "\\begin{tabular}{llcccc}",
         "\\toprule",
-        "Environment & Method & Train return & Cross-play & JS $\\downarrow$ & Env metric \\\\",
+        "Environment & Method & Train return & Same-family cross-play & JS $\\downarrow$ & Env metric \\\\",
         "\\midrule",
     ]
     for env in sorted(summary_df["env"].unique()):
         env_df = summary_df[summary_df["env"] == env]
+        cross_means = env_df.groupby("method")["crossplay_return"].mean()
+        perm_means = env_df.groupby("method")["permutation_js"].mean()
+        best_cross = float(cross_means.max()) if not cross_means.empty else None
+        best_perm = float(perm_means.min()) if not perm_means.empty else None
         for method in [m for m in ["ippo", "picr_ma", "deepsets", "otherplay"] if m in set(env_df["method"])]:
             group = env_df[env_df["method"] == method]
             train_mean, train_se = mean_se(group["train_return"].dropna())
@@ -64,9 +73,14 @@ def _main_results_table(summary_df: pd.DataFrame) -> str:
             else:
                 metric = f"succ={group['success_mean'].mean():.3f}"
             cross_text = to_pm(cross_mean, cross_se) if len(cross_values) else "--"
+            if len(cross_values) and best_cross is not None:
+                cross_text = _maybe_bold(cross_text, np.isclose(cross_mean, best_cross))
+            perm_text = to_pm(perm_mean, perm_se)
+            if best_perm is not None:
+                perm_text = _maybe_bold(perm_text, np.isclose(perm_mean, best_perm))
             lines.append(
                 f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(method))} & {to_pm(train_mean, train_se)} & "
-                f"{cross_text} & {to_pm(perm_mean, perm_se)} & {metric} \\\\"
+                f"{cross_text} & {perm_text} & {metric} \\\\"
             )
         lines.append("\\midrule")
     if lines[-1] == "\\midrule":
@@ -84,13 +98,41 @@ def _crossplay_table(crossplay_df: pd.DataFrame) -> str:
         "Environment & Ego method & Same-family & Cross-family \\\\",
         "\\midrule",
     ]
-    for (env, ego_method), group in crossplay_df.groupby(["env", "ego_method"]):
-        same = group[group["partner_method"] == ego_method]["crossplay_return"]
-        cross = group[group["partner_method"] != ego_method]["crossplay_return"]
-        lines.append(
-            f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(ego_method))} & "
-            f"{to_pm(*mean_se(same)) if len(same) else '--'} & {to_pm(*mean_se(cross)) if len(cross) else '--'} \\\\"
-        )
+    order = ["ippo", "picr_ma", "deepsets", "otherplay"]
+    for env in sorted(crossplay_df["env"].unique()):
+        env_df = crossplay_df[crossplay_df["env"] == env]
+        rows = []
+        for ego_method, group in env_df.groupby("ego_method"):
+            same = group[group["partner_method"] == ego_method]["crossplay_return"]
+            cross = group[group["partner_method"] != ego_method]["crossplay_return"]
+            same_mean, _ = mean_se(same)
+            cross_mean, _ = mean_se(cross)
+            rows.append(
+                {
+                    "ego_method": ego_method,
+                    "same_mean": same_mean if len(same) else None,
+                    "cross_mean": cross_mean if len(cross) else None,
+                    "same_text": to_pm(*mean_se(same)) if len(same) else "--",
+                    "cross_text": to_pm(*mean_se(cross)) if len(cross) else "--",
+                }
+            )
+        same_candidates = [row["same_mean"] for row in rows if row["same_mean"] is not None]
+        cross_candidates = [row["cross_mean"] for row in rows if row["cross_mean"] is not None]
+        best_same = max(same_candidates) if same_candidates else None
+        best_cross = max(cross_candidates) if cross_candidates else None
+        for row in sorted(rows, key=lambda item: order.index(item["ego_method"]) if item["ego_method"] in order else len(order)):
+            same_text = _maybe_bold(
+                row["same_text"],
+                best_same is not None and row["same_mean"] is not None and np.isclose(row["same_mean"], best_same),
+            )
+            cross_text = _maybe_bold(
+                row["cross_text"],
+                best_cross is not None and row["cross_mean"] is not None and np.isclose(row["cross_mean"], best_cross),
+            )
+            lines.append(
+                f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(row['ego_method']))} & "
+                f"{same_text} & {cross_text} \\\\"
+            )
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     return "\n".join(lines)
 
@@ -104,10 +146,16 @@ def _sensitivity_table(sensitivity_df: pd.DataFrame) -> str:
         "Environment & Method & JS divergence \\\\",
         "\\midrule",
     ]
-    grouped = sensitivity_df.groupby(["env", "method"])["permutation_js"]
-    for (env, method), values in grouped:
-        mean, se = mean_se(values)
-        lines.append(f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(method))} & {to_pm(mean, se)} \\\\")
+    order = ["ippo", "picr_ma", "deepsets", "otherplay"]
+    for env in sorted(sensitivity_df["env"].unique()):
+        env_df = sensitivity_df[sensitivity_df["env"] == env]
+        means = {method: mean_se(values)[0] for method, values in env_df.groupby("method")["permutation_js"]}
+        best_env = min(means.values()) if means else None
+        for method in [m for m in order if m in means]:
+            values = env_df[env_df["method"] == method]["permutation_js"]
+            mean, se = mean_se(values)
+            text = _maybe_bold(to_pm(mean, se), best_env is not None and np.isclose(mean, best_env))
+            lines.append(f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(method))} & {text} \\\\")
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     return "\n".join(lines)
 
@@ -125,11 +173,14 @@ def _runtime_table(summary_df: pd.DataFrame) -> str:
     for env in sorted(grouped["env"].unique()):
         env_df = grouped[grouped["env"] == env].copy()
         baseline = float(env_df.loc[env_df["method"] == "ippo", "wall_clock_runtime_sec"].iloc[0]) if any(env_df["method"] == "ippo") else None
+        fastest = float(env_df["wall_clock_runtime_sec"].min()) if not env_df.empty else None
         for _, row in env_df.iterrows():
             relative = row["wall_clock_runtime_sec"] / baseline if baseline else float("nan")
+            runtime_text = f"{row['wall_clock_runtime_sec']:.3f}"
+            runtime_text = _maybe_bold(runtime_text, fastest is not None and np.isclose(row["wall_clock_runtime_sec"], fastest))
             lines.append(
                 f"{latex_escape(_pretty_env(env))} & {latex_escape(_pretty_method(row['method']))} & "
-                f"{row['wall_clock_runtime_sec']:.3f} & {relative:.2f}$\\times$ \\\\"
+                f"{runtime_text} & {relative:.2f}$\\times$ \\\\"
             )
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     return "\n".join(lines)
@@ -175,6 +226,8 @@ def _ablation_table(results_dir: str | Path) -> str:
         env_df = ablation_df[ablation_df["env"] == env]
         if env_df.empty:
             continue
+        best_cross = float(env_df.groupby("setting")["crossplay_return"].mean().max())
+        best_js = float(env_df.groupby("setting")["permutation_js"].mean().min())
         for setting in setting_order:
             group = env_df[env_df["setting"] == setting]
             if group.empty:
@@ -182,9 +235,11 @@ def _ablation_table(results_dir: str | Path) -> str:
             cross_mean, cross_se = mean_se(group["crossplay_return"].dropna())
             js_mean, js_se = mean_se(group["permutation_js"].dropna())
             runtime_mean, _ = mean_se(group["wall_clock_runtime_sec"].dropna())
+            cross_text = _maybe_bold(to_pm(cross_mean, cross_se), np.isclose(cross_mean, best_cross))
+            js_text = _maybe_bold(to_pm(js_mean, js_se), np.isclose(js_mean, best_js))
             lines.append(
-                f"{latex_escape(_pretty_env(env))} & {setting} & {to_pm(cross_mean, cross_se)} & "
-                f"{to_pm(js_mean, js_se)} & {runtime_mean:.3f} \\\\"
+                f"{latex_escape(_pretty_env(env))} & {setting} & {cross_text} & "
+                f"{js_text} & {runtime_mean:.3f} \\\\"
             )
         lines.append("\\midrule")
     if lines[-1] == "\\midrule":

@@ -1,0 +1,60 @@
+{
+  "audit_date": "2026-04-03",
+  "official_sources": [
+    {
+      "url": "https://neurips.cc/Conferences/2026/CallForPapers",
+      "purpose": "verify official 2026 CFP and template link",
+      "established": [
+        "official 2026 CFP exists",
+        "official formatting package link is published from neurips.cc"
+      ]
+    },
+    {
+      "url": "https://media.neurips.cc/Conferences/NeurIPS2026/Formatting_Instructions_For_NeurIPS_2026.zip",
+      "purpose": "fetch official current-year style assets",
+      "fetched_successfully": true,
+      "files": [
+        "neurips_2026.tex",
+        "neurips_2026.sty",
+        "checklist.tex"
+      ]
+    },
+    {
+      "url": "https://neurips.cc/Conferences/2026/MainTrackHandbook",
+      "purpose": "verify style, page-limit, and author guidance",
+      "established": [
+        "current-year LaTeX style file is mandatory",
+        "style/page-limit violations may be desk rejected",
+        "checklist and compute-reporting guidance are official"
+      ]
+    },
+    {
+      "url": "https://neurips.cc/public/guides/PaperChecklist",
+      "purpose": "verify checklist requirement and PDF ordering",
+      "established": [
+        "checklist is required",
+        "paper + optional appendix + checklist ordering",
+        "checklist does not count toward page limit"
+      ]
+    },
+    {
+      "url": "https://neurips.cc/Conferences/2026/Dates",
+      "purpose": "verify official 2026 workshop timing",
+      "established": [
+        "workshops scheduled for 2026-12-11 to 2026-12-12"
+      ]
+    },
+    {
+      "url": "https://neurips.cc/Downloads/2026",
+      "purpose": "check official 2026 downloads/workshop visibility",
+      "established": [
+        "official downloads page exists",
+        "no concrete workshop target page was located in the inspected official sources"
+      ]
+    }
+  ],
+  "official_style_used": true,
+  "workshop_list_public": false,
+  "workshop_specific_cfp_public": false,
+  "template_strategy": "Case B theme-family targeting with official NeurIPS 2026 style"
+}

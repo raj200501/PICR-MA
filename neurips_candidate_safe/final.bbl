@@ -1,0 +1,89 @@
+\begin{thebibliography}{11}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Hu et~al.(2020)Hu, Lerer, Peysakhovich, and Foerster]{hu2020otherplay}
+Hengyuan Hu, Adam Lerer, Alexander Peysakhovich, and Jakob~N. Foerster.
+\newblock Other-play for zero-shot coordination.
+\newblock In \emph{Proceedings of the 37th International Conference on Machine
+  Learning}, 2020.
+
+\bibitem[Liu et~al.(2020)Liu, Yeh, and Schwing]{liu2020pic}
+Iou-Jen Liu, Raymond~A. Yeh, and Alexander~G. Schwing.
+\newblock Pic: Permutation invariant critic for multi-agent deep reinforcement
+  learning.
+\newblock In \emph{Proceedings of the 4th Conference on Robot Learning}, 2020.
+
+\bibitem[Lowe et~al.(2017)Lowe, Wu, Tamar, Harb, Abbeel, and
+  Mordatch]{lowe2017maddpg}
+Ryan Lowe, Yi~I. Wu, Aviv Tamar, Jean Harb, Pieter Abbeel, and Igor Mordatch.
+\newblock Multi-agent actor-critic for mixed cooperative-competitive
+  environments.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2017.
+
+\bibitem[Rashid et~al.(2018)Rashid, Samvelyan, De~Witt, Farquhar, Foerster, and
+  Whiteson]{rashid2018qmix}
+Tabish Rashid, Mikayel Samvelyan, Christian~Schroeder De~Witt, Gregory
+  Farquhar, Jakob Foerster, and Shimon Whiteson.
+\newblock Qmix: Monotonic value function factorisation for deep multi-agent
+  reinforcement learning.
+\newblock In \emph{Proceedings of the 35th International Conference on Machine
+  Learning}, 2018.
+
+\bibitem[Schulman et~al.(2017)Schulman, Wolski, Dhariwal, Radford, and
+  Klimov]{schulman2017ppo}
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov.
+\newblock Proximal policy optimization algorithms, 2017.
+\newblock arXiv:1707.06347.
+
+\bibitem[Sohn et~al.(2020)Sohn, Berthelot, Carlini, Zhang, Zhang, Raffel,
+  Cubuk, Kurakin, and Li]{sohn2020fixmatch}
+Kihyuk Sohn, David Berthelot, Nicholas Carlini, Zizhao Zhang, Han Zhang, Colin
+  Raffel, Ekin~D. Cubuk, Alex Kurakin, and Chun-Liang Li.
+\newblock Fixmatch: Simplifying semi-supervised learning with consistency and
+  confidence.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2020.
+
+\bibitem[Sunehag et~al.(2018)Sunehag, Lever, Gruslys, Czarnecki, Zambaldi,
+  Jaderberg, Lanctot, Sonnerat, Leibo, Tuyls, and Graepel]{sunehag2018vdn}
+Peter Sunehag, Guy Lever, Audrunas Gruslys, Wojciech~M. Czarnecki, Vinicius
+  Zambaldi, Max Jaderberg, Marc Lanctot, Nicolas Sonnerat, Joel~Z. Leibo, Karl
+  Tuyls, and Thore Graepel.
+\newblock Value-decomposition networks for cooperative multi-agent learning.
+\newblock In \emph{Proceedings of the 17th International Conference on
+  Autonomous Agents and MultiAgent Systems}, 2018.
+
+\bibitem[Tarvainen and Valpola(2017)]{tarvainen2017meanteacher}
+Antti Tarvainen and Harri Valpola.
+\newblock Mean teachers are better role models: Weight-averaged consistency
+  targets improve semi-supervised deep learning results.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2017.
+
+\bibitem[Terry et~al.(2020)Terry, Grammel, Son, Black, and
+  Agrawal]{terry2020ps}
+Justin~K. Terry, Nathaniel Grammel, Sanghyun Son, Benjamin Black, and Anikait
+  Agrawal.
+\newblock Revisiting parameter sharing in multi-agent deep reinforcement
+  learning, 2020.
+\newblock arXiv:2005.13625.
+
+\bibitem[Terry et~al.(2021)Terry, Black, Grammel, Jayakumar, Hari, Sullivan,
+  Santos, Perez, Horsch, Dieffendahl, Williams, Lokesh, and
+  Ravi]{terry2021pettingzoo}
+Justin~K. Terry, Benjamin Black, Nathaniel Grammel, Mario Jayakumar, Ananth
+  Hari, Ryan Sullivan, Luis Santos, Rodrigo Perez, Christopher Horsch, Caleb
+  Dieffendahl, Niall~L. Williams, Yashas Lokesh, and Praveen Ravi.
+\newblock Pettingzoo: Gym for multi-agent reinforcement learning.
+\newblock In \emph{NeurIPS Datasets and Benchmarks}, 2021.
+
+\bibitem[Zaheer et~al.(2017)Zaheer, Kottur, Ravanbakhsh, Poczos, Salakhutdinov,
+  and Smola]{zaheer2017deepsets}
+Manzil Zaheer, Satwik Kottur, Siamak Ravanbakhsh, Barnabas Poczos, Ruslan
+  Salakhutdinov, and Alexander~J. Smola.
+\newblock Deep sets.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2017.
+
+\end{thebibliography}

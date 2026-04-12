@@ -1,0 +1,39 @@
+{
+  "repo_state": "partial_scaffold",
+  "usable_manuscript_root": true,
+  "manuscript_root": "main.tex",
+  "main_tex_files": [
+    "main.tex"
+  ],
+  "multiple_main_tex": false,
+  "icml2025_sty_found": true,
+  "icml2025_sty_paths": [
+    "icml2025.sty"
+  ],
+  "existing_section_files": false,
+  "existing_results_dir_artifacts": false,
+  "existing_latex_figures": [
+    "latex/figures/learning_curves_mpe.pdf",
+    "latex/figures/zero_shot_crossplay_results.pdf",
+    "latex/figures/permutation_sensitivity_results.pdf"
+  ],
+  "existing_latex_tables": [
+    "latex/tables/main_results.tex",
+    "latex/tables/crossplay_results.tex",
+    "latex/tables/permutation_sensitivity.tex",
+    "latex/tables/runtime_results.tex"
+  ],
+  "python_package_structure": true,
+  "python_package_root": "src",
+  "marl_code_exists": true,
+  "mpe_wrapper_exists": true,
+  "mpe_wrapper_status": "placeholder",
+  "tests_exist": true,
+  "test_count": 10,
+  "git_status_clean": true,
+  "notes": [
+    "main.tex is present and should be treated as the manuscript root.",
+    "Existing latex figures/tables are scaffold artifacts and are not backed by real results/ run directories.",
+    "Core training and PPO code are currently toy implementations and require replacement for an honest experimental package."
+  ]
+}

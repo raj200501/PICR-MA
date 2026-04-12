@@ -1,0 +1,30 @@
+{
+  "run_id": "run_stage1_simple_spread_v3_otherplay_s0",
+  "run_tag": "stage1",
+  "env": "simple_spread_v3",
+  "method": "otherplay",
+  "seed": 0,
+  "profile": "PROFILE_LEAN_SAFE",
+  "training_steps": 1000,
+  "wall_clock_runtime_sec": 0.479,
+  "artifact_footprint_mb": 0.0167,
+  "package_versions": {
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "matplotlib": "3.10.8",
+    "pettingzoo": "1.24.3",
+    "gymnasium": "1.2.3",
+    "supersuit": "3.10.0",
+    "pygame": "2.6.1"
+  },
+  "git_commit": "5ab811341352e2e6a07897da2fd5330ec4436e67",
+  "train_return": -46.7310605,
+  "crossplay_return": -49.02401714747319,
+  "permutation_js": 0.004917148624814376,
+  "in_team_eval_return": -45.84630143852394,
+  "collision_mean": 0.08,
+  "goal_margin_mean": 0.0,
+  "success_mean": 0.0,
+  "crossplay_pool_run_tag": "stage1",
+  "crossplay_partner_count": 7
+}

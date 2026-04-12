@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.patches import FancyArrowPatch, Rectangle
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle
 
 from src.analysis.aggregate import build_aggregate_outputs
 from src.analysis.statistics import bootstrap_mean_ci, mean_se
@@ -19,10 +19,10 @@ METHOD_LABELS = {
     "otherplay": "Other-Play",
 }
 METHOD_COLORS = {
-    "ippo": "#4C78A8",
-    "picr_ma": "#E45756",
-    "deepsets": "#54A24B",
-    "otherplay": "#B279A2",
+    "ippo": "#335C67",
+    "picr_ma": "#C8553D",
+    "deepsets": "#6A994E",
+    "otherplay": "#A68A64",
 }
 
 
@@ -37,6 +37,10 @@ def _configure_style() -> None:
             "ytick.labelsize": 9,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
+            "axes.facecolor": "#FCFBF7",
+            "figure.facecolor": "white",
+            "axes.spines.top": False,
+            "axes.spines.right": False,
         }
     )
 
@@ -45,6 +49,14 @@ def _save(fig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
+
+
+def _style_axes(ax) -> None:
+    ax.grid(alpha=0.18, linewidth=0.6, color="#6C757D")
+    ax.set_facecolor("#FCFBF7")
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color("#333333")
+        ax.spines[spine].set_linewidth(0.8)
 
 
 def method_overview_figure(outdir: str | Path) -> str:
@@ -61,7 +73,17 @@ def method_overview_figure(outdir: str | Path) -> str:
         (0.79, 0.36, 0.16, 0.25, "Symmetric KL\nconsistency"),
     ]
     for x, y, w, h, label in boxes:
-        ax.add_patch(Rectangle((x, y), w, h, facecolor="#F8F6F1", edgecolor="#333333", linewidth=1.2))
+        ax.add_patch(
+            FancyBboxPatch(
+                (x, y),
+                w,
+                h,
+                boxstyle="round,pad=0.012,rounding_size=0.015",
+                facecolor="#F8F6F1",
+                edgecolor="#333333",
+                linewidth=1.2,
+            )
+        )
         ax.text(x + w / 2, y + h / 2, label, ha="center", va="center")
 
     arrows = [
@@ -74,6 +96,8 @@ def method_overview_figure(outdir: str | Path) -> str:
     ]
     for start, end in arrows:
         ax.add_patch(FancyArrowPatch(start, end, arrowstyle="-|>", mutation_scale=12, linewidth=1.1, color="#333333"))
+    ax.text(0.09, 0.79, "Training-time views", fontsize=9, color="#4A4A4A", weight="bold")
+    ax.text(0.79, 0.16, "No inference-time\narchitecture change", fontsize=8.5, color="#4A4A4A", ha="left")
     ax.set_title("PICR-MA: two independently permuted teammate-order views are matched by a symmetric KL penalty")
     path = Path(outdir) / "method_overview.pdf"
     _save(fig, path)
@@ -105,10 +129,10 @@ def learning_curves(train_df: pd.DataFrame, outdir: str | Path) -> str:
             se = grouped.std(ddof=0).fillna(0.0) / np.sqrt(grouped.count().clip(lower=1))
             ax.plot(mean.index, mean.values, label=METHOD_LABELS[method], color=METHOD_COLORS[method], linewidth=2)
             ax.fill_between(mean.index, mean.values - se.values, mean.values + se.values, color=METHOD_COLORS[method], alpha=0.15)
+        _style_axes(ax)
         ax.set_title(env.replace("_v3", "").replace("_", " "))
         ax.set_xlabel("Environment steps")
         ax.set_ylabel("Episodic return")
-        ax.grid(alpha=0.2, linewidth=0.5)
     handles, labels = axes[0].get_legend_handles_labels()
     if handles:
         fig.legend(handles, labels, loc="upper center", ncol=max(1, len(labels)), frameon=False)
@@ -179,10 +203,11 @@ def zsc_summary(summary_df: pd.DataFrame, outdir: str | Path) -> str:
         ax.errorbar(x, means, yerr=ses, fmt="o", color="#222222", ecolor="#222222", elinewidth=1.1, capsize=3)
         for idx, method in enumerate(methods):
             ax.scatter(x[idx], means[idx], color=METHOD_COLORS[method], s=70, zorder=3)
+        _style_axes(ax)
+        ax.axhline(0.0, color="#999999", linestyle=":", linewidth=0.9, zorder=0)
         ax.set_xticks(x, [METHOD_LABELS[method] for method in methods], rotation=20)
         ax.set_ylabel("Held-out partner cross-play return")
         ax.set_title(env.replace("_v3", "").replace("_", " "))
-        ax.grid(axis="y", alpha=0.2, linewidth=0.5)
     fig.suptitle("Held-out partner zero-shot coordination summary", y=1.02)
     path = Path(outdir) / "zero_shot_crossplay_summary.pdf"
     _save(fig, path)
@@ -220,9 +245,11 @@ def permutation_plot(sensitivity_df: pd.DataFrame, outdir: str | Path) -> str:
             for patch, color in zip(box["boxes"], colors):
                 patch.set_facecolor(color)
                 patch.set_alpha(0.35)
+            means = [np.mean(values) for values in data]
+            ax.scatter(range(1, len(means) + 1), means, marker="D", s=28, color="#111111", zorder=3)
+        _style_axes(ax)
         ax.set_title(env.replace("_v3", "").replace("_", " "))
         ax.set_ylabel("JS divergence")
-        ax.grid(axis="y", alpha=0.2, linewidth=0.5)
         ax.tick_params(axis="x", rotation=25)
     fig.suptitle("Permutation sensitivity under teammate-order swaps", y=1.02)
     path = Path(outdir) / "permutation_sensitivity_results.pdf"
@@ -255,6 +282,22 @@ def invariance_coordination_mismatch(paired_df: pd.DataFrame, outdir: str | Path
         axes = [axes]
     for ax, env in zip(axes, envs):
         env_df = plot_df[plot_df["env"] == env]
+        x_vals = env_df["delta_permutation_js"]
+        y_vals = env_df["delta_crossplay_return"]
+        x_pad = max(0.003, 0.08 * max(abs(float(x_vals.min())), abs(float(x_vals.max()))))
+        y_pad = max(0.5, 0.08 * max(abs(float(y_vals.min())), abs(float(y_vals.max()))))
+        ax.set_xlim(float(x_vals.min()) - x_pad, float(x_vals.max()) + x_pad)
+        ax.set_ylim(float(y_vals.min()) - y_pad, float(y_vals.max()) + y_pad)
+        ax.add_patch(
+            Rectangle(
+                (ax.get_xlim()[0], 0.0),
+                width=0.0 - ax.get_xlim()[0],
+                height=ax.get_ylim()[1],
+                facecolor="#DCEED1",
+                alpha=0.20,
+                zorder=0,
+            )
+        )
         ax.axvline(0.0, color="#666666", linestyle="--", linewidth=1.0)
         ax.axhline(0.0, color="#666666", linestyle="--", linewidth=1.0)
         ax.scatter(
@@ -291,6 +334,7 @@ def invariance_coordination_mismatch(paired_df: pd.DataFrame, outdir: str | Path
             capsize=3,
             zorder=4,
         )
+        _style_axes(ax)
         js_lower = int((env_df["delta_permutation_js"] < 0.0).sum())
         cross_up = int((env_df["delta_crossplay_return"] > 0.0).sum())
         ax.text(
@@ -306,7 +350,6 @@ def invariance_coordination_mismatch(paired_df: pd.DataFrame, outdir: str | Path
         ax.set_title(env.replace("_v3", "").replace("_", " "))
         ax.set_xlabel("$\\Delta$ permutation sensitivity (PICR-MA $-$ IPPO)")
         ax.set_ylabel("$\\Delta$ same-family cross-play (PICR-MA $-$ IPPO)")
-        ax.grid(alpha=0.2, linewidth=0.5)
 
     fig.suptitle("PICR-MA shifts order sensitivity in a consistent direction, but the cross-play effect flips by environment", y=1.03)
     path = Path(outdir) / "invariance_coordination_mismatch.pdf"
@@ -324,15 +367,23 @@ def runtime_overhead(summary_df: pd.DataFrame, outdir: str | Path) -> str:
         _save(fig, path)
         return str(path)
 
-    grouped = summary_df.groupby("method")["wall_clock_runtime_sec"].mean()
-    methods = [method for method in METHOD_ORDER if method in grouped.index]
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
-    values = [grouped[method] for method in methods]
-    ax.bar(range(len(methods)), values, color=[METHOD_COLORS[method] for method in methods])
-    ax.set_xticks(range(len(methods)), [METHOD_LABELS[method] for method in methods], rotation=20)
-    ax.set_ylabel("Wall-clock seconds / run")
-    ax.set_title("Runtime overhead across available runs")
-    ax.grid(axis="y", alpha=0.2, linewidth=0.5)
+    envs = [env for env in ["simple_spread_v3", "simple_adversary_v3"] if env in set(summary_df["env"])]
+    fig, ax = plt.subplots(figsize=(6.8, 3.8))
+    width = 0.18
+    x = np.arange(len(envs))
+    for offset, method in enumerate([m for m in METHOD_ORDER if m in set(summary_df["method"])]):
+        method_values = []
+        for env in envs:
+            env_df = summary_df[summary_df["env"] == env]
+            baseline = float(env_df.loc[env_df["method"] == "ippo", "wall_clock_runtime_sec"].mean())
+            method_runtime = float(env_df.loc[env_df["method"] == method, "wall_clock_runtime_sec"].mean())
+            method_values.append(method_runtime / baseline if baseline else 0.0)
+        ax.bar(x + (offset - 1.5) * width, method_values, width=width, color=METHOD_COLORS[method], label=METHOD_LABELS[method])
+    _style_axes(ax)
+    ax.set_xticks(x, [env.replace("_v3", "").replace("_", " ") for env in envs])
+    ax.set_ylabel("Relative runtime vs IPPO")
+    ax.set_title("Training-time runtime overhead")
+    ax.legend(frameon=False, ncol=2, loc="upper left")
     path = Path(outdir) / "runtime_overhead.pdf"
     _save(fig, path)
     return str(path)

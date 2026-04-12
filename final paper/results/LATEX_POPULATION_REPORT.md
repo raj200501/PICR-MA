@@ -1,0 +1,24 @@
+# LATEX POPULATION REPORT
+- main.tex found: yes
+- manuscript root: `./`
+- sections updated:
+  - abstract
+  - introduction contributions paragraph
+  - experimental setup training-details paragraph
+  - results
+  - discussion and limitations
+- figures regenerated:
+  - `method_overview.pdf`
+  - `learning_curves_mpe.pdf`
+  - `zero_shot_crossplay_results.pdf`
+  - `permutation_sensitivity_results.pdf`
+  - `runtime_overhead.pdf`
+  - `optional_matrix_games_summary.pdf`
+- tables regenerated:
+  - `main_results.tex`
+  - `crossplay_results.tex`
+  - `permutation_sensitivity.tex`
+  - `runtime_results.tex`
+- evidence source for main paper: `hardmain50k` 50k-step, 5-seed MPE cohort
+- compilation: `pdflatex` not available
+- note: manuscript claims were revised downward to match the mixed 50k evidence; the paper is not main-approved

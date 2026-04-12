@@ -36,8 +36,8 @@
     "picr_ma": {
       "train_return_mean": 6.58512020111084,
       "train_return_se": 3.5020763874053955,
-      "crossplay_return_mean": 20.159160614013672,
-      "crossplay_return_se": 2.0428121089935303,
+      "crossplay_return_mean": 19.846073150634766,
+      "crossplay_return_se": 2.0938193798065186,
       "permutation_js_mean": 0.0052706231363117695,
       "permutation_js_se": 0.002518759109079838,
       "collision_mean": 0.0,
