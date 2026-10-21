@@ -1,34 +1,36 @@
-PYTHON ?= ./.venv/bin/python
-ENV = PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp
+PYTHON ?= python
+WORKERS ?= 4
+
+.PHONY: install test lint experiments main lambda crossplay analyze paper reproduce
 
 install:
-	python3 -m venv .venv
-	./.venv/bin/pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+	$(PYTHON) -m pip install -e . --no-deps
 
-preflight:
-	$(ENV) $(PYTHON) scripts/preflight.py
+test:
+	$(PYTHON) -m pytest
 
-smoke:
-	$(ENV) $(PYTHON) scripts/install_check.py
-	$(ENV) $(PYTHON) scripts/smoke_test.py
+lint:
+	$(PYTHON) -m ruff check picr_ma scripts tests
+	$(PYTHON) -m ruff format --check picr_ma scripts tests
 
-stage1:
-	$(ENV) $(PYTHON) scripts/run_stage1.py
+# Train every run in a suite (finished runs are skipped).
+main:
+	$(PYTHON) scripts/run_experiments.py --suite main --workers $(WORKERS)
+lambda:
+	$(PYTHON) scripts/run_experiments.py --suite lambda --workers $(WORKERS)
 
-stage2:
-	$(ENV) $(PYTHON) scripts/run_stage2.py
+crossplay:
+	$(PYTHON) scripts/crossplay.py --suite main --workers $(WORKERS)
+	$(PYTHON) scripts/crossplay.py --suite lambda --workers $(WORKERS)
 
-plots:
-	$(ENV) $(PYTHON) scripts/make_plots.py
-
-tables:
-	$(ENV) $(PYTHON) scripts/make_tables.py
+# Regenerate every table, figure and number in the paper from results/.
+analyze:
+	$(PYTHON) scripts/analyze.py
 
 paper:
-	$(ENV) $(PYTHON) scripts/make_paper.py
+	cd paper && latexmk -pdf -interaction=nonstopmode main.tex
 
-clean_artifacts:
-	$(ENV) $(PYTHON) scripts/cleanup_artifacts.py
+experiments: main lambda crossplay
 
-report:
-	$(ENV) $(PYTHON) scripts/report_status.py
+reproduce: experiments analyze paper
