@@ -1,0 +1,38 @@
+# Every run reported in the paper is defined here.
+#   python scripts/run_experiments.py --suite <name>
+#
+# Seed ranges are disjoint by purpose:
+#   1000+    hyperparameter tuning of the IPPO learner (shared by all methods)
+#   100-104  selection of the PICR weight lambda          (suite: lambda)
+#   0-9      final evaluation                             (suite: main)
+# Environment seeds for evaluation are reserved separately (picr_ma/evaluation.py).
+
+defaults:
+  total_steps: 3000000
+  num_envs: 64
+  hidden: 64
+  eval_episodes: 500
+  log_every: 5
+  picr_lambda: 0.1
+  ppo:
+    lr: 0.001
+    epochs: 10
+    minibatches: 4
+    clip: 0.2
+    gamma: 0.99
+    gae_lambda: 0.95
+    vf_coef: 0.5
+    ent_coef: 0.01
+    max_grad_norm: 0.5
+
+suites:
+  lambda:
+    envs: [simple_spread_v3, simple_adversary_v3]
+    methods: [picr]
+    picr_lambdas: [0.01, 0.03, 0.1, 0.3, 1.0, 3.0]
+    seeds: [100, 101, 102, 103, 104]
+
+  main:
+    envs: [simple_spread_v3, simple_adversary_v3]
+    methods: [ippo, picr, deepsets, order_aug]
+    seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]

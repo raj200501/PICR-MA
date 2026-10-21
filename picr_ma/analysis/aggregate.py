@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from picr_ma.analysis.stats import Estimate, bootstrap_mean, bootstrap_pairs, difference
+from picr_ma.analysis.stats import Estimate, bootstrap_mean, bootstrap_pairs, difference, resample_runs
 
 METHOD_ORDER = ("ippo", "picr", "deepsets", "order_aug")
 METHOD_LABELS = {"ippo": "IPPO", "picr": "PICR", "deepsets": "Deep Sets", "order_aug": "Order aug."}
@@ -80,7 +80,7 @@ def _gap_samples(block: np.ndarray, n_boot: int = 10_000, seed: int = 0) -> np.n
     n = len(block)
     samples = np.empty(n_boot)
     for b in range(n_boot):
-        idx = rng.integers(0, n, n)
+        idx = resample_runs(n, rng, need_distinct=True)
         sub = block[np.ix_(idx, idx)]
         off = np.where(idx[:, None] == idx[None, :], np.nan, sub)
         samples[b] = np.diag(sub).mean() - np.nanmean(off)

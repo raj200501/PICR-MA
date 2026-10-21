@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Evaluate all ordered pairs of runs in a suite, per environment.
 
-    python scripts/crossplay.py --suite main --episodes 32 --workers 4
+    python scripts/crossplay.py --suite main --episodes 200 --workers 4
 
 Writes results/<suite>/<env>/crossplay.csv with one row per (ego, partner).
 """
@@ -33,7 +33,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
-    parser.add_argument("--episodes", type=int, default=32)
+    parser.add_argument("--episodes", type=int, default=200)
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 

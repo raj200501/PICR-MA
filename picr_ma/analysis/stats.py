@@ -64,10 +64,22 @@ def bootstrap_pairs(
     point = _pair_mean(matrix, np.arange(n_rows), np.arange(n_cols), same_population)
     samples = np.empty(n_boot)
     for b in range(n_boot):
-        rows = rng.integers(0, n_rows, n_rows)
+        rows = resample_runs(n_rows, rng, need_distinct=same_population)
         cols = rows if same_population else rng.integers(0, n_cols, n_cols)
         samples[b] = _pair_mean(matrix, rows, cols, same_population)
     return _estimate(point, samples)
+
+
+def resample_runs(n: int, rng: np.random.Generator, need_distinct: bool = False) -> np.ndarray:
+    """Bootstrap indices; with ``need_distinct``, redraw until at least two distinct runs are present.
+
+    Within-population cross-play is undefined for a resample containing a single
+    run (it has no distinct pairs), so such draws are rejected.
+    """
+    while True:
+        idx = rng.integers(0, n, n)
+        if not need_distinct or n < 2 or len(np.unique(idx)) > 1:
+            return idx
 
 
 def difference(a: Estimate, b: Estimate) -> dict[str, float]:
