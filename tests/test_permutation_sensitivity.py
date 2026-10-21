@@ -1,7 +1,7 @@
 import numpy as np
 
-from src.envs.observation_slicing import make_contiguous_slicing
-from src.eval.permutation_sensitivity import sensitivity
+from picr_ma.envs.observation_slicing import make_contiguous_slicing
+from picr_ma.eval.permutation_sensitivity import sensitivity
 
 
 def test_sensitivity_nonnegative():

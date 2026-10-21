@@ -1,4 +1,4 @@
-from src.analysis.statistics import bootstrap_mean_ci
+from picr_ma.analysis.statistics import bootstrap_mean_ci
 
 
 def test_bootstrap_mean_ci_constant_values():

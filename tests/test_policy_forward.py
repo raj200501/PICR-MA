@@ -1,7 +1,7 @@
 import numpy as np
 
-from src.envs.observation_slicing import make_contiguous_slicing
-from src.models.actor_critic import build_actor_critic
+from picr_ma.envs.observation_slicing import make_contiguous_slicing
+from picr_ma.models.actor_critic import build_actor_critic
 
 
 def test_mlp_policy_outputs_probabilities():

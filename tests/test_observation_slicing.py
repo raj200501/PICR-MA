@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.envs.observation_slicing import ObservationSlicing, permute_teammates, split_self_teammates, zero_teammates
+from picr_ma.envs.observation_slicing import ObservationSlicing, permute_teammates, split_self_teammates, zero_teammates
 
 
 def test_split_and_permute_manual_blocks():

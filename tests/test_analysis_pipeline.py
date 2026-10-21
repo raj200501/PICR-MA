@@ -1,8 +1,8 @@
 import os
 
-from src.analysis.aggregate import build_aggregate_outputs
-from src.analysis.plots import make_publication_plots
-from src.analysis.tables import make_tables
+from picr_ma.analysis.aggregate import build_aggregate_outputs
+from picr_ma.analysis.plots import make_publication_plots
+from picr_ma.analysis.tables import make_tables
 from scripts.evaluate import evaluate_run
 from scripts.train import run_experiment
 

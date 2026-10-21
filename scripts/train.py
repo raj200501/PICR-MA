@@ -16,21 +16,21 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.algos.ppo import PPOConfig, compute_returns_and_advantages, ppo_update
-from src.algos.rollout_buffer import RolloutBatch
-from src.envs.matrix_games import make_matrix_env
-from src.envs.mpe_wrappers import (
+from picr_ma.algos.ppo import PPOConfig, compute_returns_and_advantages, ppo_update
+from picr_ma.algos.rollout_buffer import RolloutBatch
+from picr_ma.envs.matrix_games import make_matrix_env
+from picr_ma.envs.mpe_wrappers import (
     make_mpe_env,
     simple_adversary_goal_margin,
     simple_spread_collisions,
 )
-from src.eval.permutation_sensitivity import sensitivity
-from src.methods.otherplay import permute_observation_batch, teammate_permutation
-from src.models.actor_critic import build_actor_critic
-from src.utils.config import dump_yaml
-from src.utils.io_utils import ensure_dir, write_json, write_text
-from src.utils.logging_utils import log
-from src.utils.serialization import save_npz, to_csv_gz
+from picr_ma.eval.permutation_sensitivity import sensitivity
+from picr_ma.methods.otherplay import permute_observation_batch, teammate_permutation
+from picr_ma.models.actor_critic import build_actor_critic
+from picr_ma.utils.config import dump_yaml
+from picr_ma.utils.io_utils import ensure_dir, write_json, write_text
+from picr_ma.utils.logging_utils import log
+from picr_ma.utils.serialization import save_npz, to_csv_gz
 
 
 @dataclass

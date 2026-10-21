@@ -1,9 +1,0 @@
-env,method,cooperative_param_count,adversary_param_count,training_steps,eval_episodes,picr_lambda,teammate_dropout_p,mean_runtime_sec,inference_architecture_changed,extra_train_forward_passes,shared_base_mlp_with_ippo,runtime_relative_to_ippo
-simple_adversary_v3,deepsets,3238,1222,50000,16,0.0,0.0,44.8852,True,0,False,1.339696752626552
-simple_adversary_v3,ippo,1350,1222,50000,16,0.0,0.0,33.504,False,0,True,1.0
-simple_adversary_v3,otherplay,1350,1222,50000,16,0.0,0.0,32.044599999999996,False,0,True,0.9564410219675262
-simple_adversary_v3,picr_ma,1350,1222,50000,16,0.02,0.0,44.5746,False,2,True,1.330426217765043
-simple_spread_v3,deepsets,3302,0,50000,16,0.0,0.0,62.529399999999995,True,0,False,2.0168301950083536
-simple_spread_v3,ippo,1606,0,50000,16,0.0,0.0,31.003800000000002,False,0,True,1.0
-simple_spread_v3,otherplay,1606,0,50000,16,0.0,0.0,32.3292,False,0,True,1.0427495984363206
-simple_spread_v3,picr_ma,1606,0,50000,16,0.02,0.0,50.2354,False,2,True,1.6202981570001096

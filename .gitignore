@@ -1,6 +1,27 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .venv/
-results/*
-!results/.gitkeep
+.pytest_cache/
+.ruff_cache/
+
+# Experiment outputs: checkpoints are large and regenerable
 *.ckpt
+*.npz
+results/**/run_log.txt
+
+# LaTeX build products
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

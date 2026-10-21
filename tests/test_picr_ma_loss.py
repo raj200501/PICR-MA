@@ -1,7 +1,7 @@
 import numpy as np
 
-from src.envs.observation_slicing import make_contiguous_slicing
-from src.methods.picr_ma import build_picr_views, symmetric_kl, symmetric_kl_with_gradients
+from picr_ma.envs.observation_slicing import make_contiguous_slicing
+from picr_ma.methods.picr_ma import build_picr_views, symmetric_kl, symmetric_kl_with_gradients
 
 
 def test_sym_kl_zero_same():

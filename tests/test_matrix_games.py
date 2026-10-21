@@ -1,4 +1,4 @@
-from src.envs.matrix_games import make_matrix_env
+from picr_ma.envs.matrix_games import make_matrix_env
 
 
 def test_matrix_episode_reward_and_obs_shape():

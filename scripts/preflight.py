@@ -12,8 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/mpl")
 
-from src.utils.resource_guard import select_profile
-from src.utils.system import get_system_snapshot
+from picr_ma.utils.resource_guard import select_profile
+from picr_ma.utils.system import get_system_snapshot
 
 
 MODULES = [

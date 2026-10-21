@@ -1,4 +1,4 @@
-from src.analysis.paper_exports import populate_main_tex
+from picr_ma.analysis.paper_exports import populate_main_tex
 
 
 def test_populate_main(tmp_path):

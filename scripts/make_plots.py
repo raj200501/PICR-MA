@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.analysis.plots import make_publication_plots
+from picr_ma.analysis.plots import make_publication_plots
 
 
 if __name__ == "__main__":

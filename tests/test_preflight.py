@@ -1,4 +1,4 @@
-from src.utils.resource_guard import select_profile
+from picr_ma.utils.resource_guard import select_profile
 
 
 def test_profile_selection_scaffold():

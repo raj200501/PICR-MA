@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.eval.partner_pool import load_run_summaries
+from picr_ma.eval.partner_pool import load_run_summaries
 
 
 if __name__ == "__main__":

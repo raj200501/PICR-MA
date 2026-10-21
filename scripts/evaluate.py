@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.envs.matrix_games import make_matrix_env
-from src.envs.mpe_wrappers import make_mpe_env, simple_adversary_goal_margin, simple_spread_collisions
-from src.eval.crossplay import load_policy_bundle
-from src.eval.partner_pool import load_run_summaries, partner_pool
-from src.utils.io_utils import read_json, write_json
-from src.utils.serialization import to_csv_gz
+from picr_ma.envs.matrix_games import make_matrix_env
+from picr_ma.envs.mpe_wrappers import make_mpe_env, simple_adversary_goal_margin, simple_spread_collisions
+from picr_ma.eval.crossplay import load_policy_bundle
+from picr_ma.eval.partner_pool import load_run_summaries, partner_pool
+from picr_ma.utils.io_utils import read_json, write_json
+from picr_ma.utils.serialization import to_csv_gz
 
 
 def build_env(env_name: str, seed: int):
