@@ -1,0 +1,14 @@
+{
+  "env": "simple_adversary_v3",
+  "method": "picr",
+  "seed": 101,
+  "picr_lambda": 0.01,
+  "env_steps": 5001600,
+  "train_seconds": 942.98,
+  "update_seconds": 900.18,
+  "n_params": 10630,
+  "self_play_return": 10.52113024080184,
+  "self_play_return_std": 6.678297883522324,
+  "perm_js": 0.02000746689736843,
+  "perm_flip_rate": 0.13293333333333332
+}
