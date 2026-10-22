@@ -126,6 +126,9 @@ def main() -> None:
         "method_crossplay_matrix_ego_by_partner": {env: matrices[env].round(3).to_dict(orient="index") for env in envs},
         "within_method_spearman_perm_js_vs_xp": {env: within_method_spearman(per_run[env]) for env in envs},
     }
+    selection = args.results_dir / "lambda" / "selection.json"
+    if selection.exists():
+        report["selected_lambda"] = {env: v["selected_lambda"] for env, v in json.loads(selection.read_text()).items()}
     for name in ("reference_returns", "overhead"):
         path = args.results_dir / f"{name}.json"
         if path.exists():
@@ -139,6 +142,7 @@ def main() -> None:
         figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
         report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")
 
+    (tab_dir / "numbers.tex").write_text(tables.numbers_tex(estimates, comparisons, report))
     (args.results_dir / "analysis.json").write_text(json.dumps(report, indent=2))
     (args.results_dir / "main_results.md").write_text(tables.markdown_table(estimates))
     print(tables.markdown_table(estimates))

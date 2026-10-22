@@ -19,6 +19,7 @@ Writes results/reference_returns.json.
 
 from __future__ import annotations
 
+import argparse
 import itertools
 import json
 from pathlib import Path
@@ -62,14 +63,18 @@ def run(controller: str, episodes: int, seed: int = 0) -> np.ndarray:
 
 
 def main() -> None:
-    episodes = 500
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
+    parser.add_argument("--episodes", type=int, default=500)
+    args = parser.parse_args()
+    episodes = args.episodes
     out = {}
     for controller in ["random", "noop", "assignment"]:
         returns = run(controller, episodes)
         out[controller] = {"mean": float(returns.mean()), "se": float(returns.std() / np.sqrt(episodes))}
         print(f"{controller:>10}: {returns.mean():7.2f} +- {returns.std() / np.sqrt(episodes):.2f}")
-    path = ROOT / "results" / "reference_returns.json"
-    path.parent.mkdir(exist_ok=True)
+    path = args.results_dir / "reference_returns.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"env": "simple_spread_v3", "episodes": episodes, **out}, indent=2))
 
 

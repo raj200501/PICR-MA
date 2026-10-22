@@ -14,6 +14,7 @@ IPPO's by construction.
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from dataclasses import asdict
@@ -42,8 +43,13 @@ def _median_seconds(fn, repeats: int) -> float:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
+    parser.add_argument("--config", type=Path, default=ROOT / "configs" / "experiments.yaml")
+    parser.add_argument("--repeats", type=int, default=5)
+    args = parser.parse_args()
     torch.set_num_threads(1)
-    config = expand_suite(load_suites(ROOT / "configs" / "experiments.yaml"), "main")[0].config
+    config = expand_suite(load_suites(args.config), "main", methods=["ippo"])[0].config
     out = {"ppo": asdict(config.ppo), "num_envs": config.num_envs, "picr_lambda": config.picr_lambda, "envs": {}}
     for env in ("simple_spread_v3", "simple_adversary_v3"):
         spec = env_spec(env)
@@ -64,7 +70,7 @@ def main() -> None:
             )
             optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.lr)
             ppo = PPOConfig(**{**asdict(config.ppo), "picr_lambda": config.picr_lambda if method == "picr" else 0.0})
-            update = _median_seconds(partial(ppo_update, model, optimizer, batch, ppo, rng, spec.slicing), repeats=5)
+            update = _median_seconds(partial(ppo_update, model, optimizer, batch, ppo, rng, spec.slicing), repeats=args.repeats)
             obs = batch["obs"][: config.num_envs * spec.n_team]
             forward = _median_seconds(partial(model.action_probs, obs), repeats=200)
             results[method] = {
@@ -84,7 +90,8 @@ def main() -> None:
                 f"  {method:>9}: update {r['update_seconds']:.3f}s ({r['update_vs_ippo']:.2f}x)  "
                 f"forward {r['forward_ms']:.3f}ms ({r['forward_vs_ippo']:.2f}x)  actor params {r['actor_params']}"
             )
-    (ROOT / "results" / "overhead.json").write_text(json.dumps(out, indent=2))
+    args.results_dir.mkdir(parents=True, exist_ok=True)
+    (args.results_dir / "overhead.json").write_text(json.dumps(out, indent=2))
 
 
 if __name__ == "__main__":

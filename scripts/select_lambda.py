@@ -12,6 +12,7 @@ chosen values are copied into ``picr_lambda_by_env`` in configs/experiments.yaml
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -23,7 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    suite_dir = ROOT / "results" / "lambda"
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
+    suite_dir = parser.parse_args().results_dir / "lambda"
     summaries = load_summaries(suite_dir)
     selection = {}
     for env in sorted(set(summaries.env)):

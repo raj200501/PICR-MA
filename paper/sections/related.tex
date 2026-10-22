@@ -1,0 +1,35 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Zero-shot coordination.}
+ZSC asks agents trained independently to coordinate at test time without
+having met \citep{hu2020otherplay,treutlein2021zsc}. Self-play agents often
+converge on arbitrary conventions that are mutually incompatible across
+training runs, so cross-play falls short of self-play
+\citep{carroll2019overcooked,bard2020hanabi}. Other-Play
+\citep{hu2020otherplay} removes conventions that depend on known environment
+symmetries by training against symmetry-transformed partners. Off-belief
+learning \citep{hu2021obl}, trajectory diversity \citep{lupu2021trajedi} and
+population-based training against diverse partners \citep{strouse2021fcp} are
+other routes. The symmetry we study is narrower and cheaper to exploit: the
+arbitrary order in which teammates appear in an agent's own observation.
+
+\paragraph{Permutation invariance in MARL.}
+Set-based encoders \citep{zaheer2017deepsets} make a network invariant to the
+order of its inputs by construction, and have been used for permutation-invariant
+critics \citep{liu2020pic}, for permutation-invariant and permutation-equivariant
+agent networks \citep{hao2023pipe}, and in equivariant MARL more broadly
+\citep{vanderpol2022homomorphic}. These works mostly report gains in sample
+efficiency or scalability within self-play; we ask whether invariance changes
+how well independently trained policies coordinate with each other.
+
+\paragraph{Consistency regularization.}
+Penalizing disagreement between a model's outputs on augmented views of the
+same input is standard in semi-supervised learning \citep{sohn2020fixmatch}.
+In RL, data augmentation \citep{laskin2020rad} and regularizing the policy and
+value function to be invariant to augmentations (DrAC; \citealp{raileanu2021drac})
+improve generalization, and symmetry losses have been used to obtain symmetric
+locomotion \citep{yu2018symmetric}. \picr{} is the teammate-permutation
+instance of DrAC's policy regularizer; our contribution is the controlled
+study of whether this kind of invariance matters for ZSC, not the regularizer
+itself.

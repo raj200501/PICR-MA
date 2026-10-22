@@ -119,7 +119,7 @@ def sp_vs_xp(estimates_by_env: dict, out: Path) -> None:
         plt.Line2D([], [], marker="o", color=MUTED, mfc="white", ls="", label="Self-play"),
         plt.Line2D([], [], marker="o", color=MUTED, ls="", label="Cross-play"),
     ]
-    axes[0, -1].legend(handles=handles, frameon=False, loc="best")
+    fig.legend(handles=handles, frameon=False, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.06))
     fig.savefig(out)
     plt.close(fig)
 
