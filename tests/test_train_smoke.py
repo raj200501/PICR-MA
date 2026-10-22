@@ -37,3 +37,19 @@ def test_same_seed_is_reproducible(tmp_path):
     assert gzip.decompress((tmp_path / "a" / "metrics.csv.gz").read_bytes()) == gzip.decompress(
         (tmp_path / "b" / "metrics.csv.gz").read_bytes()
     )
+
+
+def test_runs_have_independent_random_streams():
+    """Different methods (or PICR weights) with the same seed must not share initial weights or episodes."""
+    from picr_ma.train import run_seed_sequence
+
+    def state(method, lam=0.1, seed=0):
+        return tuple(
+            run_seed_sequence(TrainConfig(env="simple_spread_v3", method=method, seed=seed, picr_lambda=lam)).generate_state(4)
+        )
+
+    assert state("ippo") == state("ippo")
+    assert state("ippo") != state("picr")
+    assert state("picr", 0.1) != state("picr", 0.3)
+    assert state("ippo", 0.1) == state("ippo", 0.3)  # lambda is unused by IPPO
+    assert state("ippo", seed=0) != state("ippo", seed=1)

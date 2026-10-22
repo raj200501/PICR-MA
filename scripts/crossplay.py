@@ -28,7 +28,7 @@ def _evaluate(args):
 
 
 def main() -> None:
-    from picr_ma.crossplay import find_runs
+    from picr_ma.crossplay import adversary_pool, find_runs
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
@@ -43,7 +43,8 @@ def main() -> None:
             continue
         print(f"{env_dir.name}: {len(runs)} runs, {len(runs) ** 2} ordered pairs", flush=True)
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            chunks = list(pool.map(_evaluate, [(ego, runs, args.episodes) for ego in runs]))
+            adversaries = adversary_pool(runs)
+            chunks = list(pool.map(_evaluate, [(ego, runs, args.episodes, adversaries) for ego in runs]))
         rows = [row for chunk in chunks for row in chunk]
         out = env_dir / "crossplay.csv"
         with out.open("w", newline="") as handle:

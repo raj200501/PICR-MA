@@ -40,3 +40,21 @@ def test_cross_play_slots_follow_team_list():
     a = play_episodes(spec.name, [policy] * 3, None, eval_seeds(4), sample_seed=1)["returns"]
     b = play_episodes(spec.name, [policy, policy, policy], None, eval_seeds(4), sample_seed=1)["returns"]
     np.testing.assert_array_equal(a, b)
+
+
+def test_adversary_pool_is_assigned_round_robin():
+    """With a pool, episode i faces adversary i % K; a pool of copies equals a single adversary."""
+    spec = make_env("simple_adversary_v3").spec
+    team = [ActorCritic(spec.obs_dim, spec.n_actions)] * spec.n_team
+    still = ActorCritic(spec.adversary_obs_dim, spec.n_actions)
+    mover = ActorCritic(spec.adversary_obs_dim, spec.n_actions)
+    for model, action in [(still, 0), (mover, 2)]:  # deterministic: always the same action
+        model.policy_head.weight.data.zero_()
+        model.policy_head.bias.data.fill_(-50.0)
+        model.policy_head.bias.data[action] = 50.0
+    seeds = eval_seeds(6)
+    mixed = play_episodes(spec.name, team, [still, mover], seeds, sample_seed=3)["returns"]
+    only_still = play_episodes(spec.name, team, still, seeds, sample_seed=3)["returns"]
+    only_mover = play_episodes(spec.name, team, mover, seeds, sample_seed=3)["returns"]
+    np.testing.assert_allclose(mixed[0::2], only_still[0::2])
+    np.testing.assert_allclose(mixed[1::2], only_mover[1::2])

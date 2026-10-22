@@ -1,9 +1,14 @@
 """Cross-play: pair independently trained runs and measure team return.
 
-For an ordered pair (ego A, partner B), slot 0 of the team is controlled by A's
-policy and every other team slot by B's policy. In ``simple_adversary_v3`` the
-adversary is A's co-trained adversary, so relative to A's self-play only the
-teammates change. A == B gives self-play on the same evaluation seeds.
+For an ordered pair (ego A, partner B), team slot 0 is controlled by A's policy
+and every other team slot by B's policy; A == B is self-play. Every pairing is
+scored on the same reserved evaluation seeds.
+
+In ``simple_adversary_v3`` each run co-trains its own adversary, so scoring a
+team against its own adversary would compare methods against different
+opponents. Instead every pairing (self-play included) is scored against the
+same pool: the adversaries of all runs in the suite, assigned to evaluation
+episodes round-robin.
 """
 
 from __future__ import annotations
@@ -11,8 +16,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-
-import numpy as np
 
 from picr_ma.envs.mpe import make_env
 from picr_ma.evaluation import eval_seeds, play_episodes
@@ -40,21 +43,24 @@ def find_runs(env_dir: str | Path) -> list[RunRef]:
     return runs
 
 
-def _load(run: RunRef):
-    adversary = run.path / "adversary.pt"
-    return load_policy(run.path / "policy.pt"), (load_policy(adversary) if adversary.exists() else None)
+def adversary_pool(runs: list[RunRef]) -> list[RunRef]:
+    """Runs whose co-trained adversary joins the shared evaluation pool."""
+    return [run for run in runs if (run.path / "adversary.pt").exists()]
 
 
-def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int) -> list[dict]:
+def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int, adversaries: list[RunRef] = ()) -> list[dict]:
     """Cross-play rows for one ego against every partner (including itself)."""
     spec = make_env(ego.env).spec
-    ego_policy, ego_adversary = _load(ego)
+    ego_policy = load_policy(ego.path / "policy.pt")
+    adversary = [load_policy(run.path / "adversary.pt") for run in adversaries] or None
+    if spec.n_adversaries and adversary is None:
+        raise ValueError(f"{ego.env} cross-play needs a non-empty adversary pool")
     seeds = eval_seeds(episodes)
     rows = []
     for partner in partners:
-        partner_policy = ego_policy if partner == ego else _load(partner)[0]
+        partner_policy = ego_policy if partner == ego else load_policy(partner.path / "policy.pt")
         team = [ego_policy] + [partner_policy] * (spec.n_team - 1)
-        returns = play_episodes(ego.env, team, ego_adversary, seeds, sample_seed=0)["returns"]
+        returns = play_episodes(ego.env, team, adversary, seeds, sample_seed=0)["returns"]
         rows.append(
             {
                 "env": ego.env,
@@ -65,28 +71,7 @@ def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int) -> list[dic
                 "return_mean": float(returns.mean()),
                 "return_std": float(returns.std()),
                 "episodes": episodes,
+                "adversary_pool_size": len(adversaries),
             }
         )
     return rows
-
-
-def pair_matrix(rows: list[dict]) -> dict:
-    """Index cross-play rows as {(ego_method, ego_seed, partner_method, partner_seed): return}."""
-    return {
-        (r["ego_method"], int(r["ego_seed"]), r["partner_method"], int(r["partner_seed"])): float(r["return_mean"]) for r in rows
-    }
-
-
-def seeds_of(rows: list[dict], method: str) -> list[int]:
-    return sorted({int(r["ego_seed"]) for r in rows if r["ego_method"] == method})
-
-
-def mean_cross_play(matrix: dict, ego_method: str, ego_seeds, partner_method: str, partner_seeds) -> float:
-    """Mean return over ordered pairs of distinct runs (self-pairs excluded)."""
-    values = [
-        matrix[(ego_method, a, partner_method, b)]
-        for a in ego_seeds
-        for b in partner_seeds
-        if not (ego_method == partner_method and a == b)
-    ]
-    return float(np.mean(values)) if values else float("nan")

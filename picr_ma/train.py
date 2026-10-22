@@ -20,6 +20,7 @@ import csv
 import gzip
 import json
 import time
+import zlib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -55,6 +56,17 @@ class TrainConfig:
             self.ppo = PPOConfig(**self.ppo)
 
 
+def run_seed_sequence(config: TrainConfig) -> np.random.SeedSequence:
+    """Independent random streams for every (method, PICR weight, seed) triple.
+
+    Seeding on ``seed`` alone would give, for example, IPPO seed 3 and PICR seed
+    3 identical initial weights and training episodes, so cross-method partners
+    would not be independently trained.
+    """
+    lam = config.picr_lambda if config.method == "picr" else 0.0
+    return np.random.SeedSequence([config.seed, zlib.crc32(config.method.encode()), int(round(lam * 1e6))])
+
+
 def _policy_input(method: str, obs: np.ndarray, slicing, rng: np.random.Generator) -> np.ndarray:
     if method == "order_aug" and slicing.n_teammates > 1:
         return permute_teammates(obs, slicing, random_permutations(len(obs), slicing.n_teammates, rng))
@@ -85,11 +97,12 @@ def _act(model: ActorCritic, obs: np.ndarray, generator: torch.Generator):
 def train(config: TrainConfig, out_dir: str | Path) -> dict:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    torch.manual_seed(config.seed)
     torch.set_num_threads(1)
-    rng = np.random.default_rng([config.seed, 0])
-    env_rng = np.random.default_rng([config.seed, 1])
-    generator = torch.Generator().manual_seed(config.seed)
+    init_seed, sample_seed, rng_seed, env_seed = run_seed_sequence(config).generate_state(4)
+    torch.manual_seed(int(init_seed))  # network initialization
+    generator = torch.Generator().manual_seed(int(sample_seed))  # action sampling
+    rng = np.random.default_rng(rng_seed)  # minibatch order, permutations
+    env_rng = np.random.default_rng(env_seed)  # training episode seeds
 
     env = make_env(config.env)
     spec = env.spec

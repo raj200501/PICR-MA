@@ -25,13 +25,16 @@ def eval_seeds(n: int) -> list[int]:
 def play_episodes(
     env_name: str,
     team: list[ActorCritic],
-    adversary: ActorCritic | None,
+    adversary: ActorCritic | list[ActorCritic] | None,
     seeds: list[int],
     sample_seed: int = 0,
     greedy: bool = False,
     collect_obs: bool = False,
 ) -> dict[str, np.ndarray]:
     """Roll out one episode per seed (in parallel); team slot ``i`` is controlled by ``team[i]``.
+
+    ``adversary`` may be a list of policies, in which case episode ``i`` is played
+    against ``adversary[i % len(adversary)]``.
 
     Returns per-episode team returns (sum over time of the mean team reward) and
     optionally the visited team observations, flattened to (episodes*T*N, D).
@@ -40,6 +43,10 @@ def play_episodes(
     spec = env.spec
     if len(team) != spec.n_team:
         raise ValueError(f"{env_name} has {spec.n_team} team slots, got {len(team)} policies")
+    adversaries = list(adversary) if isinstance(adversary, (list, tuple)) else [adversary]
+    if spec.n_adversaries and any(a is None for a in adversaries):
+        raise ValueError(f"{env_name} needs an adversary policy")
+    assignment = np.arange(len(seeds)) % len(adversaries)
     generator = torch.Generator().manual_seed(sample_seed)
     obs = env.reset(seeds)
     returns = np.zeros(len(seeds))
@@ -51,8 +58,13 @@ def play_episodes(
         actions = np.stack([policy.act(obs["team"][:, slot], generator, greedy)[0] for slot, policy in enumerate(team)], axis=1)
         adv_actions = None
         if spec.n_adversaries:
-            adv_actions = adversary.act(obs["adversary"].reshape(-1, spec.adversary_obs_dim), generator, greedy)[0]
-            adv_actions = adv_actions.reshape(len(seeds), spec.n_adversaries)
+            adv_actions = np.empty((len(seeds), spec.n_adversaries), dtype=np.int64)
+            for k, policy in enumerate(adversaries):
+                rows = assignment == k
+                if not rows.any():
+                    continue
+                adv_obs = obs["adversary"][rows].reshape(-1, spec.adversary_obs_dim)
+                adv_actions[rows] = policy.act(adv_obs, generator, greedy)[0].reshape(-1, spec.n_adversaries)
         obs, team_rewards, _, done = env.step(actions, adv_actions)
         returns += team_rewards.mean(axis=1)
     out = {"returns": returns}
