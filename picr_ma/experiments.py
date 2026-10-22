@@ -1,7 +1,9 @@
 """Expand ``configs/experiments.yaml`` into concrete training runs.
 
-A suite lists environments, methods, seeds and (optionally) a list of PICR
-weights. Every combination becomes one run directory:
+A suite lists environments, methods, seeds and optionally either a list of
+PICR weights to sweep (``picr_lambdas``) or one selected weight per
+environment (``picr_lambda_by_env``). Every combination becomes one run
+directory:
 
     results/<suite>/<env>/<method>[_lam<lambda>]/seed<k>/
 
@@ -44,7 +46,7 @@ def load_suites(path: str | Path) -> dict:
 TRAIN_KEYS = ("total_steps", "num_envs", "hidden", "picr_lambda", "eval_episodes", "log_every")
 
 
-def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results") -> list[Run]:
+def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results", methods: list[str] | None = None) -> list[Run]:
     defaults = spec.get("defaults", {})
     suite_spec = spec["suites"][suite]
     merged = {**defaults, **suite_spec}
@@ -52,9 +54,19 @@ def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results") ->
     ppo = PPOConfig(**{**defaults.get("ppo", {}), **suite_spec.get("ppo", {})})
     runs = []
     for env, method, lam, seed in itertools.product(
-        suite_spec["envs"], suite_spec["methods"], suite_spec.get("picr_lambdas", [None]), suite_spec["seeds"]
+        suite_spec["envs"],
+        [m for m in suite_spec["methods"] if methods is None or m in methods],
+        suite_spec.get("picr_lambdas", [None]),
+        suite_spec["seeds"],
     ):
-        fields = base if lam is None else {**base, "picr_lambda": lam}
+        fields = dict(base)
+        if lam is not None:
+            fields["picr_lambda"] = lam
+        elif env in suite_spec.get("picr_lambda_by_env", {}):
+            selected = suite_spec["picr_lambda_by_env"][env]
+            if selected is None and method == "picr":
+                raise ValueError(f"No PICR weight selected for {env} yet; run scripts/select_lambda.py first")
+            fields["picr_lambda"] = selected if selected is not None else fields.get("picr_lambda", 0.1)
         config = TrainConfig(env=env, method=method, seed=seed, ppo=ppo, **fields)
         out_dir = Path(results_dir) / suite / env / _variant(method, lam) / f"seed{seed}"
         runs.append(Run(suite=suite, config=config, out_dir=out_dir))

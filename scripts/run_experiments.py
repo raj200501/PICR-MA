@@ -34,10 +34,11 @@ def main() -> None:
     parser.add_argument("--config", default=ROOT / "configs" / "experiments.yaml")
     parser.add_argument("--results-dir", default=ROOT / "results")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--methods", nargs="+", help="train only these methods of the suite")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    runs = expand_suite(load_suites(args.config), args.suite, args.results_dir)
+    runs = expand_suite(load_suites(args.config), args.suite, args.results_dir, args.methods)
     todo = [r for r in runs if not r.done]
     print(f"suite {args.suite}: {len(runs)} runs, {len(runs) - len(todo)} done, {len(todo)} to train", flush=True)
     if args.dry_run:

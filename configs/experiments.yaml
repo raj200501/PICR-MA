@@ -2,14 +2,15 @@
 #   python scripts/run_experiments.py --suite <name>
 #
 # Seed ranges are disjoint by purpose:
-#   1000+    hyperparameter tuning of the IPPO learner (shared by all methods)
+#   1000+    hyperparameter tuning of the IPPO learner (shared by all methods;
+#            see docs/tuning.md)
 #   100-104  selection of the PICR weight lambda          (suite: lambda)
 #   0-9      final evaluation                             (suite: main)
 # Environment seeds for evaluation are reserved separately (picr_ma/evaluation.py).
 
 defaults:
-  total_steps: 3000000
-  num_envs: 64
+  total_steps: 5000000
+  num_envs: 128
   hidden: 64
   eval_episodes: 500
   log_every: 5
@@ -17,7 +18,7 @@ defaults:
   ppo:
     lr: 0.001
     epochs: 10
-    minibatches: 4
+    minibatches: 8
     clip: 0.2
     gamma: 0.99
     gae_lambda: 0.95
@@ -29,10 +30,14 @@ suites:
   lambda:
     envs: [simple_spread_v3, simple_adversary_v3]
     methods: [picr]
-    picr_lambdas: [0.01, 0.03, 0.1, 0.3, 1.0, 3.0]
+    picr_lambdas: [0.01, 0.03, 0.1, 0.3, 1.0]
     seeds: [100, 101, 102, 103, 104]
 
+  # lambda for the main suite is chosen per environment by
+  # scripts/select_lambda.py: highest mean same-variant cross-play on the
+  # lambda-suite seeds (rule fixed before the lambda suite was run).
   main:
     envs: [simple_spread_v3, simple_adversary_v3]
     methods: [ippo, picr, deepsets, order_aug]
+    picr_lambda_by_env: {simple_spread_v3: null, simple_adversary_v3: null}  # filled from results/lambda/selection.json
     seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
