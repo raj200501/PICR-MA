@@ -1,7 +1,10 @@
+# Full pipeline:  make reproduce   (about 130 training runs; see README for timing)
+# Steps run in order; finished training runs are skipped on re-runs.
 PYTHON ?= python
 WORKERS ?= 4
 
-.PHONY: install test lint experiments main lambda crossplay analyze paper reproduce
+.NOTPARALLEL:
+.PHONY: install test lint lambda select main crossplay-main reference overhead analyze figures paper reproduce
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
@@ -14,23 +17,37 @@ lint:
 	$(PYTHON) -m ruff check picr_ma scripts tests
 	$(PYTHON) -m ruff format --check picr_ma scripts tests
 
-# Train every run in a suite (finished runs are skipped).
-main:
-	$(PYTHON) scripts/run_experiments.py --suite main --workers $(WORKERS)
+# 1. Select the PICR weight on seeds 100-104 (writes results/lambda/selection.json;
+#    copy the chosen values into picr_lambda_by_env in configs/experiments.yaml).
 lambda:
 	$(PYTHON) scripts/run_experiments.py --suite lambda --workers $(WORKERS)
-
-crossplay:
-	$(PYTHON) scripts/crossplay.py --suite main --workers $(WORKERS)
 	$(PYTHON) scripts/crossplay.py --suite lambda --workers $(WORKERS)
 
-# Regenerate every table, figure and number in the paper from results/.
-analyze:
+select: lambda
+	$(PYTHON) scripts/select_lambda.py
+
+# 2. Main comparison on seeds 0-9 and all-pairs cross-play.
+main: select
+	$(PYTHON) scripts/run_experiments.py --suite main --workers $(WORKERS)
+
+crossplay-main: main
+	$(PYTHON) scripts/crossplay.py --suite main --workers $(WORKERS)
+
+# 3. Reference points and controlled cost measurements.
+reference:
+	$(PYTHON) scripts/reference_returns.py
+
+overhead:
+	$(PYTHON) scripts/benchmark_overhead.py
+
+# 4. Every table, figure and number in the paper.
+figures:
+	$(PYTHON) scripts/make_method_figure.py
+
+analyze: crossplay-main reference overhead figures
 	$(PYTHON) scripts/analyze.py
 
 paper:
-	cd paper && latexmk -pdf -interaction=nonstopmode main.tex
+	cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 
-experiments: main lambda crossplay
-
-reproduce: experiments analyze paper
+reproduce: analyze paper

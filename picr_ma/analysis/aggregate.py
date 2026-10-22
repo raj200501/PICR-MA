@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from picr_ma.analysis.stats import Estimate, bootstrap_mean, bootstrap_pairs, difference, resample_runs
+from picr_ma.analysis.stats import Estimate, bootstrap_mean, bootstrap_pairs, difference, permutation_test, resample_runs
 
 METHOD_ORDER = ("ippo", "picr", "deepsets", "order_aug")
 METHOD_LABELS = {"ippo": "IPPO", "picr": "PICR", "deepsets": "Deep Sets", "order_aug": "Order aug."}
@@ -69,7 +69,6 @@ def method_estimates(summaries: pd.DataFrame, xp: pd.DataFrame, env: str, method
             "gap": Estimate(sp.mean - cross.mean, *np.percentile(gap_samples, [2.5, 97.5]), gap_samples),
             "perm_js": bootstrap_mean(runs.perm_js.to_numpy(), seed=i),
             "flip": bootstrap_mean(runs.perm_flip_rate.to_numpy(), seed=i),
-            "sec_per_1k_steps": bootstrap_mean(1000 * runs.train_seconds.to_numpy() / runs.env_steps.to_numpy(), seed=i),
         }
     return out
 
@@ -87,17 +86,31 @@ def _gap_samples(block: np.ndarray, n_boot: int = 10_000, seed: int = 0) -> np.n
     return samples
 
 
-def compare_to(estimates: dict[str, dict[str, Estimate]], baseline: str = "ippo") -> dict[str, dict[str, dict[str, float]]]:
+def compare_to(
+    estimates: dict[str, dict[str, Estimate]],
+    summaries: pd.DataFrame,
+    xp: pd.DataFrame,
+    env: str,
+    baseline: str = "ippo",
+    n_perm: int = 10_000,
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Each method minus the baseline: point difference, bootstrap 95% CI and permutation p-value."""
     out = {}
     for method, metrics in estimates.items():
         if method == baseline:
             continue
-        out[method] = {name: difference(metrics[name], estimates[baseline][name]) for name in metrics}
+        order = [method, baseline]
+        matrix = np.block([[crossplay_block(xp, ego, partner) for partner in order] for ego in order])
+        runs = pd.concat([summaries[(summaries.env == env) & (summaries.variant == m)].sort_values("seed") for m in order])
+        per_run = {"perm_js": runs.perm_js.to_numpy(), "flip": runs.perm_flip_rate.to_numpy()}
+        n_a = int((runs.variant == method).sum())
+        p_values = permutation_test(matrix, per_run, n_a, n_perm=n_perm)
+        out[method] = {name: {**difference(metrics[name], estimates[baseline][name]), "p": p_values[name]} for name in metrics}
     return out
 
 
 def method_matrix(xp: pd.DataFrame, methods=METHOD_ORDER) -> pd.DataFrame:
-    """Mean cross-play between methods (rows: ego, columns: partner), self-pairs excluded."""
+    """Mean cross-play between methods (index: ego method, columns: partner method), self-pairs excluded."""
     present = [m for m in methods if m in set(xp.ego_method)]
     table = pd.DataFrame(index=present, columns=present, dtype=float)
     for ego in present:

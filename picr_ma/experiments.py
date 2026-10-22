@@ -7,15 +7,16 @@ directory:
 
     results/<suite>/<env>/<method>[_lam<lambda>]/seed<k>/
 
-A run is skipped when its ``summary.json`` already exists, so interrupted
-suites resume where they stopped.
+A run is skipped when it already finished with the same config, so interrupted
+suites resume where they stopped; a finished run whose stored config differs
+from the current one is an error rather than being silently reused.
 """
 
 from __future__ import annotations
 
 import itertools
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import yaml
@@ -32,7 +33,16 @@ class Run:
 
     @property
     def done(self) -> bool:
-        return (self.out_dir / "summary.json").exists()
+        """True if this run finished with the current config; raises if it finished with a different one."""
+        if not (self.out_dir / "summary.json").exists():
+            return False
+        stored = json.loads((self.out_dir / "config.json").read_text())
+        if stored != json.loads(json.dumps(asdict(self.config))):
+            raise RuntimeError(
+                f"{self.out_dir} was trained with a different config than configs/experiments.yaml now specifies; "
+                "move the directory away to retrain it"
+            )
+        return True
 
 
 def _variant(method: str, lam: float | None) -> str:
@@ -67,6 +77,8 @@ def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results", me
             if selected is None and method == "picr":
                 raise ValueError(f"No PICR weight selected for {env} yet; run scripts/select_lambda.py first")
             fields["picr_lambda"] = selected if selected is not None else fields.get("picr_lambda", 0.1)
+        if method != "picr":
+            fields["picr_lambda"] = 0.0  # unused by other methods; fixed so their configs do not depend on it
         config = TrainConfig(env=env, method=method, seed=seed, ppo=ppo, **fields)
         out_dir = Path(results_dir) / suite / env / _variant(method, lam) / f"seed{seed}"
         runs.append(Run(suite=suite, config=config, out_dir=out_dir))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Draw the PICR method overview (paper/figures/method_overview.pdf)."""
+"""Draw the PICR method overview (paper/figures/method_overview.pdf and docs/method_overview.png)."""
 
 from __future__ import annotations
 
@@ -76,6 +76,7 @@ def main() -> None:
     arrow(ax, (7.95, 0.55), (8.35, 1.3), PICR)
     box(ax, 8.4, 1.12, 1.75, 0.68, "symmetric KL\n" + r"$\mathcal{L}_\mathrm{PICR}$ (train only)", color=PICR, fill="#fdf0ea")
     fig.savefig(ROOT / "paper" / "figures" / "method_overview.pdf", bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(ROOT / "docs" / "method_overview.png", dpi=200, bbox_inches="tight", pad_inches=0.05, facecolor="white")
 
 
 if __name__ == "__main__":

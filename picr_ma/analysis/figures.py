@@ -78,7 +78,8 @@ def learning_curves(curves_by_env: dict[str, pd.DataFrame], out: Path) -> None:
                 ax.set_yscale("log")
             ax.set_ylabel(label)
             if row == 0:
-                ax.set_title(ENV_LABELS.get(env, env))
+                title = ENV_LABELS.get(env, env)
+                ax.set_title(title + (" (vs. own co-trained adversary)" if env == "simple_adversary_v3" else ""))
             if row == 1:
                 ax.set_xlabel("Environment steps (thousands)")
     axes[0, 0].legend(frameon=False, loc="lower right")

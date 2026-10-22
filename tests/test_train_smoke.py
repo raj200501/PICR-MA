@@ -53,3 +53,16 @@ def test_runs_have_independent_random_streams():
     assert state("picr", 0.1) != state("picr", 0.3)
     assert state("ippo", 0.1) == state("ippo", 0.3)  # lambda is unused by IPPO
     assert state("ippo", seed=0) != state("ippo", seed=1)
+
+
+def test_finished_run_with_a_different_config_is_not_reused(tmp_path):
+    import pytest
+
+    from picr_ma.experiments import Run
+
+    config = TrainConfig(env="simple_spread_v3", method="ippo", seed=0, total_steps=100, num_envs=4, eval_episodes=4)
+    train(config, tmp_path)
+    assert Run("s", config, tmp_path).done
+    changed = TrainConfig(env="simple_spread_v3", method="ippo", seed=0, total_steps=200, num_envs=4, eval_episodes=4)
+    with pytest.raises(RuntimeError, match="different config"):
+        _ = Run("s", changed, tmp_path).done

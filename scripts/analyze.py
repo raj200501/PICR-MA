@@ -4,7 +4,8 @@
     python scripts/analyze.py
 
 Reads results/main (and results/lambda if present) and writes
-paper/figures/*.pdf, paper/tables/*.tex and results/analysis.json.
+paper/figures/*.pdf, paper/tables/*.tex and results/analysis.json. Fails if the
+runs on disk differ from the runs configs/experiments.yaml defines.
 """
 
 from __future__ import annotations
@@ -28,8 +29,31 @@ from picr_ma.analysis.aggregate import (
     method_matrix,
 )
 from picr_ma.analysis.stats import bootstrap_mean, bootstrap_pairs
+from picr_ma.experiments import expand_suite, load_suites
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def check_complete(suite: str, results_dir: Path, config_path: Path) -> None:
+    """The finished runs on disk must be exactly the suite's runs, each trained with its current config."""
+    runs = expand_suite(load_suites(config_path), suite, results_dir)
+    unfinished = sorted(str(run.out_dir) for run in runs if not run.done)  # raises on a config mismatch
+    unexpected = sorted(
+        str(p.parent) for p in (results_dir / suite).glob("*/*/seed*/summary.json") if p.parent not in {r.out_dir for r in runs}
+    )
+    if unfinished or unexpected:
+        raise SystemExit(
+            f"results/{suite} does not match the config.\n  unfinished: {unfinished[:5]}\n  unexpected: {unexpected[:5]}"
+        )
+
+
+def within_method_spearman(per_run: pd.DataFrame) -> dict[str, float]:
+    """Spearman correlation between a run's permutation sensitivity and its cross-play, within each method."""
+    out = {}
+    for method, runs in per_run.groupby("method"):
+        if runs.perm_js.std() > 0:
+            out[method] = float(runs[["perm_js", "xp"]].corr("spearman").iloc[0, 1])
+    return out
 
 
 def per_run_table(summaries: pd.DataFrame, xp: pd.DataFrame, env: str) -> pd.DataFrame:
@@ -70,19 +94,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
     parser.add_argument("--paper-dir", type=Path, default=ROOT / "paper")
+    parser.add_argument("--config", type=Path, default=ROOT / "configs" / "experiments.yaml")
     args = parser.parse_args()
     fig_dir, tab_dir = args.paper_dir / "figures", args.paper_dir / "tables"
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
 
     main_dir = args.results_dir / "main"
+    check_complete("main", args.results_dir, args.config)
     summaries = load_summaries(main_dir)
     envs = [e for e in ("simple_spread_v3", "simple_adversary_v3") if e in set(summaries.env)]
     estimates, comparisons, curves, per_run, matrices = {}, {}, {}, {}, {}
     for env in envs:
         xp = load_crossplay(main_dir, env)
         estimates[env] = method_estimates(summaries, xp, env)
-        comparisons[env] = compare_to(estimates[env])
+        comparisons[env] = compare_to(estimates[env], summaries, xp, env)
         curves[env] = load_curves(main_dir, env)
         per_run[env] = per_run_table(summaries, xp, env)
         matrices[env] = method_matrix(xp)
@@ -97,14 +123,18 @@ def main() -> None:
         "seeds_per_method": {env: summaries[summaries.env == env].groupby("variant").seed.nunique().to_dict() for env in envs},
         "estimates": {env: {m: {k: v.as_dict() for k, v in est.items()} for m, est in estimates[env].items()} for env in envs},
         "vs_ippo": comparisons,
-        "method_crossplay_matrix": {env: matrices[env].round(3).to_dict() for env in envs},
-        "sensitivity_xp_spearman": {
-            env: float(per_run[env][per_run[env].method != "deepsets"][["perm_js", "xp"]].corr("spearman").iloc[0, 1])
-            for env in envs
-        },
+        "method_crossplay_matrix_ego_by_partner": {env: matrices[env].round(3).to_dict(orient="index") for env in envs},
+        "within_method_spearman_perm_js_vs_xp": {env: within_method_spearman(per_run[env]) for env in envs},
     }
+    for name in ("reference_returns", "overhead"):
+        path = args.results_dir / f"{name}.json"
+        if path.exists():
+            report[name] = json.loads(path.read_text())
+    if "overhead" in report:
+        (tab_dir / "overhead.tex").write_text(tables.overhead_table(report["overhead"]))
     lambda_dir = args.results_dir / "lambda"
     if lambda_dir.exists() and any(lambda_dir.glob("*/crossplay.csv")):
+        check_complete("lambda", args.results_dir, args.config)
         sweep = lambda_table(lambda_dir)
         figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
         report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")

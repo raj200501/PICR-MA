@@ -30,7 +30,7 @@ def main_table(estimates_by_env: dict) -> str:
 
 
 def _p(p: float) -> str:
-    return "$<$0.001" if p < 1e-3 else f"{p:.3f}"
+    return f"{p:.3f}" if p >= 1e-3 else "$<$0.001"
 
 
 def comparison_table(comparisons_by_env: dict) -> str:
@@ -68,3 +68,23 @@ def markdown_table(estimates_by_env: dict) -> str:
                 f"| {ENV_LABELS.get(env, env)} | {METHOD_LABELS[method]} | {fmt(e['sp'])} | {fmt(e['xp'])} | {fmt(e['gap'])} | {fmt(e['perm_js'], 1e3, '{:.1f}')} |"
             )
     return "\n".join(rows) + "\n"
+
+
+def overhead_table(overhead: dict) -> str:
+    lines = [
+        r"\begin{tabular}{llccc}",
+        r"\toprule",
+        r"Env. & Method & PPO update (s) & Inference forward (ms) & Actor parameters \\",
+        r"\midrule",
+    ]
+    for k, (env, methods) in enumerate(overhead["envs"].items()):
+        if k:
+            lines.append(r"\midrule")
+        for method in [m for m in METHOD_ORDER if m in methods]:
+            r = methods[method]
+            lines.append(
+                f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & {r['update_seconds']:.2f} ({r['update_vs_ippo']:.2f}$\\times$) & "
+                f"{r['forward_ms']:.3f} ({r['forward_vs_ippo']:.2f}$\\times$) & {r['actor_params']} \\\\"
+            )
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"

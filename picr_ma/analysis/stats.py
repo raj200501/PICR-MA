@@ -1,10 +1,18 @@
-"""Bootstrap statistics with independent training seeds as the unit of analysis.
+"""Statistics with independent training runs (seeds) as the unit of analysis.
 
-Per-run quantities (self-play return, permutation sensitivity) use an ordinary
-bootstrap over seeds. Cross-play is a mean over ordered pairs of *distinct*
-runs; pairs that share a run are not independent, so it uses a cluster
-bootstrap: resample seeds with replacement, then recompute the all-pairs mean
-over the resampled runs (a run drawn twice is never paired with itself).
+Confidence intervals: per-run quantities (self-play return, permutation
+sensitivity) use a percentile bootstrap over seeds. Cross-play is a mean over
+ordered pairs of *distinct* runs; pairs that share a run are not independent,
+so it uses a cluster bootstrap: resample seeds with replacement, then recompute
+the all-pairs mean over the resampled runs (a run drawn twice is never paired
+with itself). Percentile intervals under-cover somewhat at 5-10 seeds, so they
+are descriptive.
+
+Hypothesis tests between two methods use a permutation test over run labels:
+pool the runs of both methods, re-split them at random into groups of the
+original sizes, and recompute every statistic (cross-play included, using the
+full cross-method pairing matrix). This is exact under the null hypothesis that
+the two methods produce exchangeable runs.
 """
 
 from __future__ import annotations
@@ -82,13 +90,46 @@ def resample_runs(n: int, rng: np.random.Generator, need_distinct: bool = False)
             return idx
 
 
+def group_statistics(matrix: np.ndarray, idx: np.ndarray, per_run: dict[str, np.ndarray]) -> dict[str, float]:
+    """Self-play, cross-play, gap and per-run means for the runs ``idx`` of a pooled pairing matrix."""
+    sub = matrix[np.ix_(idx, idx)]
+    sp = float(np.diag(sub).mean())
+    xp = float(sub[~np.eye(len(idx), dtype=bool)].mean())
+    return {"sp": sp, "xp": xp, "gap": sp - xp, **{k: float(v[idx].mean()) for k, v in per_run.items()}}
+
+
+def permutation_test(
+    matrix: np.ndarray,
+    per_run: dict[str, np.ndarray],
+    n_a: int,
+    n_perm: int = 10_000,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Two-sided permutation p-values for (group A - group B) of every statistic.
+
+    ``matrix`` is the square cross-play matrix over the pooled runs, with the
+    ``n_a`` runs of A first; ``per_run`` maps names to per-run values in the same
+    order. p = (1 + #{|perm diff| >= |observed diff|}) / (1 + n_perm).
+    """
+    n = len(matrix)
+    a, b = np.arange(n_a), np.arange(n_a, n)
+    stat_a, stat_b = group_statistics(matrix, a, per_run), group_statistics(matrix, b, per_run)
+    observed = {k: stat_a[k] - stat_b[k] for k in stat_a}
+    exceed = dict.fromkeys(observed, 0)
+    rng = np.random.default_rng(seed)
+    for _ in range(n_perm):
+        order = rng.permutation(n)
+        pa, pb = group_statistics(matrix, order[:n_a], per_run), group_statistics(matrix, order[n_a:], per_run)
+        for k in observed:
+            exceed[k] += abs(pa[k] - pb[k]) >= abs(observed[k]) - 1e-12
+    return {k: (1 + exceed[k]) / (1 + n_perm) for k in observed}
+
+
 def difference(a: Estimate, b: Estimate) -> dict[str, float]:
     """a - b for estimates from independent seed populations.
 
-    Returns the point difference, a percentile 95% CI and a two-sided
-    bootstrap p-value (twice the smaller tail mass at zero).
+    Returns the point difference and a percentile 95% CI from the two
+    independent bootstrap distributions. Use ``permutation_test`` for p-values.
     """
-    diff = a.samples - b.samples
-    tail = min(np.mean(diff <= 0), np.mean(diff >= 0))
-    lo, hi = np.nanpercentile(diff, [2.5, 97.5])
-    return {"diff": a.mean - b.mean, "ci_lo": float(lo), "ci_hi": float(hi), "p": float(min(1.0, 2 * tail))}
+    lo, hi = np.nanpercentile(a.samples - b.samples, [2.5, 97.5])
+    return {"diff": a.mean - b.mean, "ci_lo": float(lo), "ci_hi": float(hi)}
