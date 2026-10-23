@@ -78,27 +78,37 @@ def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int, adversaries
 
 
 def evaluate_order_shift(run: RunRef, episodes: int, adversaries: list[RunRef] = ()) -> list[dict]:
-    """Self-play of one run under every teammate ordering, identity included.
+    """Self-play of one run under every teammate ordering, plus a teammate-ablation control.
 
     Uses the same evaluation seeds, sampling seed and adversary pool as
     cross-play, so the identity row equals the cross-play diagonal and the
-    drop under a permutation is a paired comparison.
+    drop under a permutation is a paired comparison. The ``ablated`` row zeroes
+    all teammate features, showing how much the policy relies on them at all.
     """
     spec = make_env(run.env).spec
     policy = load_policy(run.path / "policy.pt")
     adversary = [load_policy(r.path / "adversary.pt") for r in adversaries] or None
+    identity = tuple(range(spec.slicing.n_teammates))
+    conditions = [("identity" if p == identity else "permuted", p, False) for p in spec.slicing.all_permutations()]
+    conditions.append(("ablated", identity, True))
     rows = []
-    for perm in spec.slicing.all_permutations(include_identity=True):
+    for kind, perm, ablate in conditions:
         returns = play_episodes(
-            run.env, [policy] * spec.n_team, adversary, eval_seeds(episodes), sample_seed=0, teammate_permutation=perm
+            run.env,
+            [policy] * spec.n_team,
+            adversary,
+            eval_seeds(episodes),
+            sample_seed=0,
+            teammate_permutation=perm,
+            ablate_teammates=ablate,
         )
         rows.append(
             {
                 "env": run.env,
                 "method": run.method,
                 "seed": run.seed,
+                "kind": kind,
                 "permutation": "-".join(map(str, perm)),
-                "identity": perm == tuple(range(len(perm))),
                 "return_mean": float(returns["returns"].mean()),
                 "episodes": episodes,
             }

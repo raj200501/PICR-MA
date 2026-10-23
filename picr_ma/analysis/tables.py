@@ -109,6 +109,7 @@ METRIC_MACRO = {
     "perm_js": ("JS", 1e3, "{:.1f}"),
     "flip": ("Flip", 1.0, "{:.2f}"),
     "shift_drop": ("Shift", 1.0, "{:.2f}"),
+    "ablation_drop": ("Ablation", 1.0, "{:.2f}"),
 }
 
 

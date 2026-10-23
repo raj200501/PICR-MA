@@ -71,10 +71,28 @@ def test_order_shift_is_identity_for_invariant_policies_and_matches_cross_play_d
     runs = find_runs(tmp_path / env)
     for run in runs:
         rows = evaluate_order_shift(run, episodes=8)
-        identity = [r for r in rows if r["identity"]]
-        shifted = [r for r in rows if not r["identity"]]
+        identity = [r for r in rows if r["kind"] == "identity"]
+        shifted = [r for r in rows if r["kind"] == "permuted"]
         assert len(identity) == 1 and len(shifted) == 1  # 2 teammates -> one non-identity order
+        assert [r["kind"] for r in rows].count("ablated") == 1
         diagonal = next(r for r in evaluate_ego(run, [run], episodes=8))
         assert identity[0]["return_mean"] == diagonal["return_mean"]
         if run.method == "deepsets":
             assert shifted[0]["return_mean"] == identity[0]["return_mean"]
+
+
+def test_ablating_teammates_zeroes_exactly_the_teammate_blocks():
+    spec = make_env("simple_spread_v3").spec
+    seen = []
+
+    class Recorder(ActorCritic):
+        def act(self, obs, generator=None, greedy=False):
+            seen.append(obs.copy())
+            return super().act(obs, generator, greedy)
+
+    policy = Recorder(spec.obs_dim, spec.n_actions)
+    play_episodes(spec.name, [policy] * 3, None, eval_seeds(2), ablate_teammates=True)
+    obs = np.concatenate(seen)
+    teammate = list(np.ravel(spec.slicing.teammate_blocks))
+    assert np.all(obs[:, teammate] == 0)
+    assert np.any(obs[:, list(spec.slicing.self_indices)] != 0)
