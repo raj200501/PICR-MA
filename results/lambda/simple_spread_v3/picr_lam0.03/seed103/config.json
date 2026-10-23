@@ -1,0 +1,23 @@
+{
+  "env": "simple_spread_v3",
+  "method": "picr",
+  "seed": 103,
+  "total_steps": 5000000,
+  "num_envs": 128,
+  "hidden": 64,
+  "picr_lambda": 0.03,
+  "eval_episodes": 500,
+  "log_every": 5,
+  "ppo": {
+    "lr": 0.001,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip": 0.2,
+    "epochs": 10,
+    "minibatches": 8,
+    "vf_coef": 0.5,
+    "ent_coef": 0.01,
+    "max_grad_norm": 0.5,
+    "picr_lambda": 0.0
+  }
+}

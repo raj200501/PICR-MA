@@ -1,0 +1,54 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2026}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{enumitem}
+
+% Every number in the text is a macro written by scripts/analyze.py.
+\input{tables/numbers.tex}
+
+\newcommand{\picr}{PICR}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\JS}{\mathrm{JS}}
+\newcommand{\E}{\mathbb{E}}
+
+\title{Does Teammate-Order Invariance Help Zero-Shot Coordination?\\A Controlled Study in Cooperative MARL}
+
+\author{%
+  Raj Kashikar \\
+  Virginia Tech \\
+  \texttt{rajskashikar@vt.edu}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{sections/abstract.tex}
+\end{abstract}
+
+\input{sections/introduction.tex}
+\input{sections/related.tex}
+\input{sections/method.tex}
+\input{sections/setup.tex}
+\input{sections/results.tex}
+\input{sections/discussion.tex}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\input{sections/appendix.tex}
+
+\end{document}

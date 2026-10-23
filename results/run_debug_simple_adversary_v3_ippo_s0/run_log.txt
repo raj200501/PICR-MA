@@ -1,2 +1,0 @@
-{'episode': 0, 'env_step': 10, 'episodic_return': 9.559758, 'success_rate': 0.0, 'policy_loss': -0.003407, 'value_loss': 70.690819, 'picr_loss': 0.0, 'adversary_policy_loss': 0.043783}
-{'episode': 1, 'env_step': 20, 'episodic_return': 4.212499, 'success_rate': 0.0, 'policy_loss': 0.003058, 'value_loss': 14.20909, 'picr_loss': 0.0, 'adversary_policy_loss': 0.01967}

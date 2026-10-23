@@ -1,0 +1,67 @@
+\section{Experimental protocol}
+\label{sec:setup}
+
+\paragraph{Environments.}
+We use two PettingZoo MPE scenarios \citep{lowe2017maddpg,mordatch2018emergence,terry2021pettingzoo}
+with three cooperating agents and 25-step episodes. In \texttt{simple\_spread}
+the agents must cover three landmarks without colliding; teammate blocks hold a
+teammate's relative position (and an always-zero communication channel). In
+\texttt{simple\_adversary} the agents must keep an adversary, which does not
+know the goal landmark, away from it, typically by sending one agent to the goal
+and the others to decoy landmarks; the adversary is a separate policy trained
+against the team. For speed we re-implemented both scenarios as batched NumPy
+environments. They reproduce the reference \texttt{mpe2} implementation step for
+step (observations, rewards and seeded resets) under identical actions, which our
+test suite checks, and run about $50\times$ faster. As calibration, on our
+evaluation episodes in \texttt{simple\_spread} a uniform random policy scores
+\RefRandom{} and a scripted controller that uses global state to assign agents to
+landmarks scores \RefAssign.
+
+\paragraph{Learner.}
+All methods use the same shared-parameter PPO learner
+\citep{schulman2017ppo,dewitt2020ippo,yu2022mappo}: separate two-layer tanh MLPs
+(64 units) for actor and critic, per-agent GAE
+\citep{schulman2016gae} ($\gamma{=}0.99$, $\lambda_{\mathrm{GAE}}{=}0.95$), clip
+0.2, entropy coefficient 0.01, Adam with learning rate $10^{-3}$, 10 epochs of 8
+minibatches per update of 128 episodes, and $5\times10^{6}$ environment steps
+per run. These settings were tuned for \emph{IPPO alone} on a separate tuning
+seed and reused for every method (Appendix~\ref{app:tuning}), so the baseline is
+at least as well tuned as the alternatives.
+
+\paragraph{Selecting $\lambda$.}
+\picr's weight was chosen per environment, by a rule fixed before any selection
+run: the $\lambda \in \{0.01, 0.03, 0.1, 0.3, 1\}$ with the highest mean
+cross-play on five selection seeds that are disjoint from the evaluation seeds.
+This gives $\lambda=\SpreadLambda$ for \texttt{simple\_spread} and
+$\lambda=\AdversaryLambda$ for \texttt{simple\_adversary}. Choosing $\lambda$ on
+cross-play favours \picr{} relative to the baselines, which have no comparable
+knob; it makes a negative result for \picr{} more informative, not less.
+
+\paragraph{Zero-shot coordination.}
+For each environment we train 10 independent runs (seeds 0--9) of every method
+and evaluate \emph{all ordered pairs} of runs. For runs $A \neq B$, $A$'s policy
+controls one agent and $B$'s policy the other two; $A=B$ is self-play. Every
+pairing is scored on the same 200 evaluation episodes, whose environment seeds
+are never used in training. \emph{Self-play} (SP) is the mean over runs of the
+diagonal; \emph{cross-play} (XP) is the mean over ordered pairs of distinct
+runs of the same method; the \emph{gap} SP$-$XP measures how much a method's
+policies rely on conventions that independently trained partners do not share.
+In \texttt{simple\_adversary} every team faces the same pool of adversaries,
+those of all runs, assigned to episodes round-robin, so that methods are not
+compared against different opponents.
+
+\paragraph{Invariance.}
+On states visited by each final policy in self-play we report the mean
+Jensen--Shannon divergence between $\pi(\cdot\mid o)$ and $\pi(\cdot\mid\sigma o)$
+over all non-identity permutations $\sigma$ (``perm.\ JS''; at most $\ln 2$), and
+the fraction of (state, permutation) pairs on which the greedy action changes.
+
+\paragraph{Statistics.}
+Training runs are the unit of analysis \citep{henderson2018matters,agarwal2021precipice}.
+We report means with 95\% percentile-bootstrap intervals over seeds; cross-play
+intervals use a cluster bootstrap that resamples runs and recomputes the
+all-pairs mean, because pairs sharing a run are dependent. Differences between
+a method and IPPO are tested with permutation tests over run labels (10{,}000
+permutations), which recompute cross-play from the full matrix of cross-method
+pairings and are exact under the null hypothesis that the two methods produce
+exchangeable runs.

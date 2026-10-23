@@ -1,34 +1,53 @@
-PYTHON ?= ./.venv/bin/python
-ENV = PYTHONPATH=. MPLCONFIGDIR=/tmp/mpl XDG_CACHE_HOME=/tmp
+# Full pipeline:  make reproduce   (about 130 training runs; see README for timing)
+# Steps run in order; finished training runs are skipped on re-runs.
+PYTHON ?= python
+WORKERS ?= 4
+
+.NOTPARALLEL:
+.PHONY: install test lint lambda select main crossplay-main reference overhead analyze figures paper reproduce
 
 install:
-	python3 -m venv .venv
-	./.venv/bin/pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+	$(PYTHON) -m pip install -e . --no-deps
 
-preflight:
-	$(ENV) $(PYTHON) scripts/preflight.py
+test:
+	$(PYTHON) -m pytest
 
-smoke:
-	$(ENV) $(PYTHON) scripts/install_check.py
-	$(ENV) $(PYTHON) scripts/smoke_test.py
+lint:
+	$(PYTHON) -m ruff check picr_ma scripts tests
+	$(PYTHON) -m ruff format --check picr_ma scripts tests
 
-stage1:
-	$(ENV) $(PYTHON) scripts/run_stage1.py
+# 1. Select the PICR weight on seeds 100-104 (writes results/lambda/selection.json;
+#    copy the chosen values into picr_lambda_by_env in configs/experiments.yaml).
+lambda:
+	$(PYTHON) scripts/run_experiments.py --suite lambda --workers $(WORKERS)
+	$(PYTHON) scripts/crossplay.py --suite lambda --workers $(WORKERS)
 
-stage2:
-	$(ENV) $(PYTHON) scripts/run_stage2.py
+select: lambda
+	$(PYTHON) scripts/select_lambda.py
 
-plots:
-	$(ENV) $(PYTHON) scripts/make_plots.py
+# 2. Main comparison on seeds 0-9 and all-pairs cross-play.
+main: select
+	$(PYTHON) scripts/run_experiments.py --suite main --workers $(WORKERS)
 
-tables:
-	$(ENV) $(PYTHON) scripts/make_tables.py
+crossplay-main: main
+	$(PYTHON) scripts/crossplay.py --suite main --workers $(WORKERS)
+
+# 3. Reference points and controlled cost measurements.
+reference:
+	$(PYTHON) scripts/reference_returns.py
+
+overhead:
+	$(PYTHON) scripts/benchmark_overhead.py
+
+# 4. Every table, figure and number in the paper.
+figures:
+	$(PYTHON) scripts/make_method_figure.py
+
+analyze: crossplay-main reference overhead figures
+	$(PYTHON) scripts/analyze.py
 
 paper:
-	$(ENV) $(PYTHON) scripts/make_paper.py
+	cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 
-clean_artifacts:
-	$(ENV) $(PYTHON) scripts/cleanup_artifacts.py
-
-report:
-	$(ENV) $(PYTHON) scripts/report_status.py
+reproduce: analyze paper

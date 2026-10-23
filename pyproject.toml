@@ -1,23 +1,40 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "picr_ma"
-version = "0.1.0"
-description = "PICR-MA small-compute reproducible MARL experiments"
-requires-python = ">=3.10"
+name = "picr-ma"
+version = "1.0.0"
+description = "Does teammate-order invariance help zero-shot coordination? A controlled study in cooperative MARL."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Raj Kashikar" }]
+requires-python = ">=3.12"
 dependencies = [
-  "gymnasium>=1.2",
-  "matplotlib>=3.10",
-  "numpy>=2.0",
-  "pandas>=2.2",
-  "pettingzoo>=1.24",
-  "pygame>=2.6",
+  "numpy>=1.26",
+  "torch>=2.2",
+  "pandas>=2.1",
+  "matplotlib>=3.8",
   "pyyaml>=6.0",
-  "supersuit>=3.10",
 ]
 
+[project.optional-dependencies]
+# mpe2 is only needed to check the batched environments against the reference implementation.
+dev = ["pytest>=8", "ruff>=0.6", "mpe2>=1.1"]
+
+[tool.setuptools.packages.find]
+include = ["picr_ma*"]
+
 [tool.pytest.ini_options]
-pythonpath = ["."]
 addopts = "-q"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E731", "E501", "B905"]
