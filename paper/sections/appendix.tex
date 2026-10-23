@@ -1,0 +1,55 @@
+\section{Hyperparameter tuning}
+\label{app:tuning}
+
+All four methods share one PPO configuration, tuned for IPPO alone on
+\texttt{simple\_spread} with a separate tuning seed (1000) and checked on
+\texttt{simple\_adversary}. Selection used self-play return on the reserved
+evaluation episodes. We varied the learning rate ($3{\times}10^{-4}$ to
+$2{\times}10^{-3}$), epochs per update (5--15), minibatches (4--16), episodes per
+update (32--256) and the entropy coefficient (0 or 0.01); the full table is in
+\texttt{docs/tuning.md}. Each configuration was run with a single seed, so
+differences of 1--2 return points are within seed-to-seed noise. The chosen
+configuration (learning rate $10^{-3}$, 10 epochs, 8 minibatches, 128 episodes
+per update, entropy 0.01) reached a training return still improving slowly at
+$5\times10^{6}$ steps.
+
+\section{Environment re-implementation}
+\label{app:env}
+
+Our batched environments follow the \texttt{mpe2} reference implementation of
+\texttt{simple\_spread\_v3} (local reward ratio 0.5, agent radius 0.15, soft
+contact forces) and \texttt{simple\_adversary\_v3} ($N=3$ good agents, one
+adversary, shaped distance rewards), with discrete actions and 25-step
+episodes. Resets reproduce the reference random-number draws exactly. The test
+suite steps both implementations side by side under random actions from
+several seeds and checks that observations agree to $10^{-5}$ and rewards to
+$10^{-6}$ at every step. In \texttt{simple\_spread} the agents are silent, so
+the two communication entries in each teammate block are always zero.
+
+\section{Order sensitivity of the trained policies}
+\label{app:sensitivity}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/learning_curves.pdf}
+\caption{Training return (top) and permutation sensitivity on the training
+batch (bottom) over training; mean $\pm$ one standard error over 10 seeds. Deep
+Sets is exactly invariant and is omitted from the bottom row. In
+\texttt{simple\_adversary} the training return is measured against each run's
+own co-trained adversary and is therefore not comparable across methods.}
+\label{fig:curves}
+\end{figure}
+
+\section{Training and inference cost}
+\label{app:cost}
+
+\begin{table}[h]
+\centering
+\caption{Cost of one PPO update (128 episodes, 10 epochs of 8 minibatches) and
+of one batched forward pass at inference time, measured in a single process on
+one CPU thread on identical synthetic batches (median of 5 and 200 repeats).
+\picr{} and IPPO deploy the same network. Order augmentation permutes inputs
+while acting, so its update cost equals IPPO's by construction.}
+\label{tab:cost}
+\resizebox{\linewidth}{!}{\input{tables/overhead.tex}}
+\end{table}
