@@ -73,3 +73,20 @@ def test_end_to_end_pipeline(tmp_path):
     assert 0 < comparison["picr"]["xp"]["p"] <= 1
     summary = json.loads((tmp_path / "suite" / env / "picr" / "seed0" / "summary.json").read_text())
     assert summary["picr_lambda"] > 0
+
+
+def test_additive_decomposition_separates_competence_from_compatibility():
+    from picr_ma.analysis.additive import fit_additive, residuals
+
+    rng = np.random.default_rng(0)
+    n = 12
+    skill = rng.normal(0, 1, n)
+    additive = 0.5 * skill[:, None] + 1.0 * skill[None, :]
+    mu, a, b = fit_additive(additive + 3.0)
+    mask = ~np.eye(n, dtype=bool)
+    np.testing.assert_allclose((mu + a[:, None] + b[None, :])[mask], (additive + 3.0)[mask], atol=1e-8)
+    # Two conventions: pairs from different groups lose 2 points. The additive fit cannot absorb this.
+    group = np.arange(n) % 2
+    with_conventions = additive - 2.0 * (group[:, None] != group[None, :])
+    assert np.abs(residuals(with_conventions)).max() > 0.5
+    assert np.abs(residuals(additive)).max() < 1e-6

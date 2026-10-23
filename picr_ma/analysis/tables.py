@@ -146,6 +146,14 @@ def numbers_tex(estimates_by_env: dict, comparisons_by_env: dict, report: dict) 
                 define(f"{e_name}{m_name}d{k_name}p", f"$p{{=}}{d['p']:.3f}$" if d["p"] >= 1e-3 else "$p{<}0.001$")
         for method, rho in report.get("within_method_spearman_perm_js_vs_xp", {}).get(env, {}).items():
             define(f"{e_name}{METHOD_MACRO[method]}Rho", _num(rho, "{:.2f}"))
+    for env, dec in report.get("additive_decomposition", {}).items():
+        e_name = ENV_MACRO[env]
+        define(f"{e_name}AddRsq", f"{100 * dec['r2_additive']:.1f}\\%")
+        define(f"{e_name}EgoPartnerCorr", _num(dec["corr_ego_partner_effect"], "{:.2f}"))
+        define(f"{e_name}ResidSD", _num(dec["sd_residual"], "{:.2f}"))
+        define(f"{e_name}TotalSD", _num(dec["sd_total"], "{:.2f}"))
+        if "residual_split_half_corr" in dec:
+            define(f"{e_name}ResidRel", _num(dec["residual_split_half_corr"], "{:.2f}"))
     for env, lam in report.get("selected_lambda", {}).items():
         define(f"{ENV_MACRO[env]}Lambda", f"{lam:g}")
     ref = report.get("reference_returns", {})

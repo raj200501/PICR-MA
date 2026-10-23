@@ -197,3 +197,40 @@ def lambda_sweep(sweep: pd.DataFrame, out: Path) -> None:
     fig.align_ylabels(axes[:, 0])
     fig.savefig(out)
     plt.close(fig)
+
+
+def additive_fit(xp_by_env: dict, out: Path) -> None:
+    """Cross-play of every ordered pair of distinct runs vs. the additive (ego + partner skill) prediction."""
+    from picr_ma.analysis.additive import fit_additive, pair_matrix
+
+    envs = list(xp_by_env)
+    fig, axes = plt.subplots(1, len(envs), figsize=(3.3 * len(envs), 2.6), squeeze=False)
+    for ax, env in zip(axes[0], envs):
+        matrix, runs = pair_matrix(xp_by_env[env])
+        mu, a, b = fit_additive(matrix)
+        pred = mu + a[:, None] + b[None, :]
+        mask = ~np.eye(len(runs), dtype=bool)
+        ego_method = np.array([r.split("/")[0] for r in runs])[:, None].repeat(len(runs), axis=1)
+        for method in METHOD_ORDER:
+            sel = mask & (ego_method == method)
+            if sel.any():
+                ax.scatter(
+                    pred[sel],
+                    matrix[sel],
+                    s=4,
+                    alpha=0.5,
+                    color=COLORS[method],
+                    marker=MARKERS[method],
+                    lw=0,
+                    label=METHOD_LABELS[method],
+                )
+        lo, hi = matrix[mask].min(), matrix[mask].max()
+        ax.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, ls="--")
+        r2 = 1 - ((matrix - pred)[mask] ** 2).sum() / ((matrix[mask] - matrix[mask].mean()) ** 2).sum()
+        ax.text(0.04, 0.92, f"$R^2$ = {r2:.3f}", transform=ax.transAxes, fontsize=7.5, color=INK)
+        ax.set_xlabel("Additive prediction (ego + partner skill)")
+        ax.set_ylabel("Cross-play return")
+        ax.set_title(ENV_LABELS.get(env, env))
+    axes[0, -1].legend(frameon=False, loc="lower right", markerscale=2.5)
+    fig.savefig(out)
+    plt.close(fig)

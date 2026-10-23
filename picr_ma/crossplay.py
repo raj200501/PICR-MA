@@ -61,6 +61,7 @@ def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int, adversaries
         partner_policy = ego_policy if partner == ego else load_policy(partner.path / "policy.pt")
         team = [ego_policy] + [partner_policy] * (spec.n_team - 1)
         returns = play_episodes(ego.env, team, adversary, seeds, sample_seed=0)["returns"]
+        half = len(returns) // 2
         rows.append(
             {
                 "env": ego.env,
@@ -70,6 +71,9 @@ def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int, adversaries
                 "partner_seed": partner.seed,
                 "return_mean": float(returns.mean()),
                 "return_std": float(returns.std()),
+                # Means over disjoint halves of the episodes, for split-half reliability.
+                "return_mean_half1": float(returns[:half].mean()),
+                "return_mean_half2": float(returns[half:].mean()),
                 "episodes": episodes,
                 "adversary_pool_size": len(adversaries),
             }

@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from picr_ma.analysis import figures, tables
+from picr_ma.analysis.additive import additive_decomposition
 from picr_ma.analysis.aggregate import (
     METHOD_ORDER,
     compare_to,
@@ -105,9 +106,10 @@ def main() -> None:
     check_complete("main", args.results_dir, args.config)
     summaries = load_summaries(main_dir)
     envs = [e for e in ("simple_spread_v3", "simple_adversary_v3") if e in set(summaries.env)]
-    estimates, comparisons, curves, per_run, matrices = {}, {}, {}, {}, {}
+    estimates, comparisons, curves, per_run, matrices, crossplays = {}, {}, {}, {}, {}, {}
     for env in envs:
         xp = load_crossplay(main_dir, env)
+        crossplays[env] = xp
         shift = load_order_shift(main_dir, env)
         estimates[env] = method_estimates(summaries, xp, env, shift=shift)
         comparisons[env] = compare_to(estimates[env], summaries, xp, env, shift=shift)
@@ -118,6 +120,7 @@ def main() -> None:
     figures.learning_curves(curves, fig_dir / "learning_curves.pdf")
     figures.sp_vs_xp(estimates, fig_dir / "self_play_vs_cross_play.pdf")
     figures.sensitivity_vs_crossplay(per_run, fig_dir / "sensitivity_vs_cross_play.pdf")
+    figures.additive_fit(crossplays, fig_dir / "additive_fit.pdf")
     (tab_dir / "main_results.tex").write_text(tables.main_table(estimates))
     (tab_dir / "comparison.tex").write_text(tables.comparison_table(comparisons))
 
@@ -127,6 +130,7 @@ def main() -> None:
         "vs_ippo": comparisons,
         "method_crossplay_matrix_ego_by_partner": {env: matrices[env].round(3).to_dict(orient="index") for env in envs},
         "within_method_spearman_perm_js_vs_xp": {env: within_method_spearman(per_run[env]) for env in envs},
+        "additive_decomposition": {env: additive_decomposition(crossplays[env]) for env in envs},
     }
     selection = args.results_dir / "lambda" / "selection.json"
     if selection.exists():
