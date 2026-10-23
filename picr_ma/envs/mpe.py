@@ -29,7 +29,10 @@ import numpy as np
 
 from picr_ma.envs.slicing import TeammateSlicing
 
-ENV_NAMES = ("simple_spread_v3", "simple_adversary_v3")
+ENV_NAMES = ("simple_spread_v3", "simple_adversary_v3", "spread_clustered")
+# Controlled variants: (base scenario, spawn mode). Not part of PettingZoo/mpe2.
+VARIANTS = {"spread_clustered": ("simple_spread_v3", "clustered")}
+CLUSTER_STD = 0.05
 
 DT = 0.1
 DAMPING = 0.25
@@ -80,9 +83,10 @@ class BatchedMPE:
         if name not in ENV_NAMES:
             raise KeyError(f"Unknown environment {name!r}; expected one of {ENV_NAMES}")
         self.name = name
+        self.scenario, self.spawn = VARIANTS.get(name, (name, "uniform"))
         self.n = n_agents
         self.horizon = horizon
-        if name == "simple_spread_v3":
+        if self.scenario == "simple_spread_v3":
             self.spec = EnvSpec(name, 6 * n_agents, 5, n_agents, _spread_slicing(n_agents), horizon=horizon)
             self.n_world_agents = n_agents
         else:
@@ -107,10 +111,17 @@ class BatchedMPE:
         self.goal = np.zeros(b, dtype=np.int64)
         for i, seed in enumerate(seeds):
             rng = np.random.default_rng(int(seed))  # == gymnasium.utils.seeding.np_random(seed)
-            if self.name == "simple_adversary_v3":
+            if self.scenario == "simple_adversary_v3":
                 self.goal[i] = rng.integers(self.n)
-            for a in range(self.n_world_agents):
-                self.pos[i, a] = rng.uniform(-1, 1, 2)
+            if self.spawn == "clustered":
+                # All agents start within a few centimetres of one random point, so
+                # "go to the nearest landmark" sends them all to the same one and
+                # the team must agree on how to split up.
+                center = rng.uniform(-1, 1, 2)
+                self.pos[i] = center + rng.normal(0, CLUSTER_STD, (self.n_world_agents, 2))
+            else:
+                for a in range(self.n_world_agents):
+                    self.pos[i, a] = rng.uniform(-1, 1, 2)
             for lm in range(self.n):
                 self.landmarks[i, lm] = rng.uniform(-1, 1, 2)
         self.vel = np.zeros_like(self.pos)
@@ -125,13 +136,13 @@ class BatchedMPE:
         done) where ``done`` is True once the horizon is reached.
         """
         team_actions = np.asarray(team_actions, dtype=np.int64)
-        if self.name == "simple_adversary_v3":
+        if self.scenario == "simple_adversary_v3":
             adversary_actions = np.zeros((len(team_actions), 1), np.int64) if adversary_actions is None else adversary_actions
             actions = np.concatenate([np.asarray(adversary_actions, dtype=np.int64), team_actions], axis=1)
         else:
             actions = team_actions
         force = SENSITIVITY * ACTION_DIRECTIONS[actions]
-        if self.name == "simple_spread_v3":
+        if self.scenario == "simple_spread_v3":
             force = force + self._contact_forces(self.pos, size=0.15)
         self.pos = self.pos + self.vel * DT
         self.vel = self.vel * (1 - DAMPING) + force * DT
@@ -152,7 +163,7 @@ class BatchedMPE:
 
     def _rewards(self) -> tuple[np.ndarray, np.ndarray]:
         b = len(self.pos)
-        if self.name == "simple_spread_v3":
+        if self.scenario == "simple_spread_v3":
             to_lm = np.linalg.norm(self.pos[:, :, None] - self.landmarks[:, None], axis=-1)  # (B, agent, lm)
             global_reward = -to_lm.min(axis=1).sum(axis=1)  # (B,)
             dist = np.linalg.norm(self.pos[:, :, None] - self.pos[:, None], axis=-1)
@@ -172,7 +183,7 @@ class BatchedMPE:
         rel_agents = self.pos[:, others] - self.pos[:, :, None]  # (B, agent, n-1, 2)
         rel_lms = self.landmarks[:, None] - self.pos[:, :, None]  # (B, agent, lm, 2)
         b = len(self.pos)
-        if self.name == "simple_spread_v3":
+        if self.scenario == "simple_spread_v3":
             comm = np.zeros((b, self.n, 2 * (self.n - 1)))
             team = np.concatenate(
                 [self.vel, self.pos, rel_lms.reshape(b, self.n, -1), rel_agents.reshape(b, self.n, -1), comm], axis=-1

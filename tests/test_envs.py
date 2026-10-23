@@ -72,3 +72,21 @@ def test_specs():
     assert (spread.obs_dim, spread.n_actions, spread.n_team, spread.n_adversaries) == (18, 5, 3, 0)
     adversary = make_env("simple_adversary_v3").spec
     assert (adversary.obs_dim, adversary.n_team, adversary.n_adversaries, adversary.adversary_obs_dim) == (14, 3, 1, 12)
+
+
+def test_clustered_variant_spawns_agents_together_and_keeps_spread_dynamics():
+    clustered, standard = make_env("spread_clustered"), make_env("simple_spread_v3")
+    assert clustered.spec.name == "spread_clustered"
+    assert clustered.spec.obs_dim == standard.spec.obs_dim
+    assert clustered.spec.slicing == standard.spec.slicing
+    clustered.reset(list(range(200)))
+    spread = np.linalg.norm(clustered.pos - clustered.pos.mean(axis=1, keepdims=True), axis=-1)
+    assert spread.max() < 0.3  # every agent starts within a few cm of the cluster centre
+    # After reset, dynamics and rewards are those of simple_spread.
+    standard.reset(list(range(200)))
+    standard.pos, standard.landmarks, standard.vel = clustered.pos.copy(), clustered.landmarks.copy(), clustered.vel.copy()
+    actions = np.random.default_rng(0).integers(0, 5, (200, 3))
+    obs_c, rew_c, _, _ = clustered.step(actions)
+    obs_s, rew_s, _, _ = standard.step(actions)
+    np.testing.assert_allclose(rew_c, rew_s)
+    np.testing.assert_allclose(obs_c["team"], obs_s["team"])
