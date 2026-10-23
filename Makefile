@@ -4,7 +4,7 @@ PYTHON ?= python
 WORKERS ?= 4
 
 .NOTPARALLEL:
-.PHONY: install test lint lambda select main crossplay-main reference overhead analyze figures paper reproduce
+.PHONY: install test lint lambda select main crossplay-main order-shift reference overhead analyze figures paper reproduce
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
@@ -33,6 +33,10 @@ main: select
 crossplay-main: main
 	$(PYTHON) scripts/crossplay.py --suite main --workers $(WORKERS)
 
+# Self-play when every agent sees its teammates in a different order.
+order-shift: main
+	$(PYTHON) scripts/order_shift.py --suite main --workers $(WORKERS)
+
 # 3. Reference points and controlled cost measurements.
 reference:
 	$(PYTHON) scripts/reference_returns.py
@@ -44,7 +48,7 @@ overhead:
 figures:
 	$(PYTHON) scripts/make_method_figure.py
 
-analyze: crossplay-main reference overhead figures
+analyze: crossplay-main order-shift reference overhead figures
 	$(PYTHON) scripts/analyze.py
 
 paper:

@@ -58,3 +58,23 @@ def test_adversary_pool_is_assigned_round_robin():
     only_mover = play_episodes(spec.name, team, mover, seeds, sample_seed=3)["returns"]
     np.testing.assert_allclose(mixed[0::2], only_still[0::2])
     np.testing.assert_allclose(mixed[1::2], only_mover[1::2])
+
+
+def test_order_shift_is_identity_for_invariant_policies_and_matches_cross_play_diagonal(tmp_path):
+    from picr_ma.crossplay import evaluate_ego, evaluate_order_shift, find_runs
+    from picr_ma.train import TrainConfig, train
+
+    env = "simple_spread_v3"
+    for method in ["ippo", "deepsets"]:
+        config = TrainConfig(env=env, method=method, seed=0, total_steps=200, num_envs=4, eval_episodes=4, log_every=1)
+        train(config, tmp_path / env / method / "seed0")
+    runs = find_runs(tmp_path / env)
+    for run in runs:
+        rows = evaluate_order_shift(run, episodes=8)
+        identity = [r for r in rows if r["identity"]]
+        shifted = [r for r in rows if not r["identity"]]
+        assert len(identity) == 1 and len(shifted) == 1  # 2 teammates -> one non-identity order
+        diagonal = next(r for r in evaluate_ego(run, [run], episodes=8))
+        assert identity[0]["return_mean"] == diagonal["return_mean"]
+        if run.method == "deepsets":
+            assert shifted[0]["return_mean"] == identity[0]["return_mean"]

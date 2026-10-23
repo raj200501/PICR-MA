@@ -44,7 +44,28 @@ def crossplay_block(xp: pd.DataFrame, ego: str, partner: str) -> np.ndarray:
     return block.pivot(index="ego_seed", columns="partner_seed", values="return_mean").sort_index().sort_index(axis=1).to_numpy()
 
 
-def method_estimates(summaries: pd.DataFrame, xp: pd.DataFrame, env: str, methods=METHOD_ORDER) -> dict[str, dict[str, Estimate]]:
+def load_order_shift(suite_dir: str | Path, env: str) -> pd.DataFrame | None:
+    path = Path(suite_dir) / env / "order_shift.csv"
+    return pd.read_csv(path) if path.exists() else None
+
+
+def order_shift_per_run(shift: pd.DataFrame, method: str) -> pd.DataFrame:
+    """Per run (sorted by seed): self-play under identity order, mean under shifted orders, and the drop."""
+    rows = shift[shift.method == method]
+    identity = rows[rows.identity].set_index("seed").return_mean
+    shifted = rows[~rows.identity].groupby("seed").return_mean.mean()
+    out = pd.DataFrame({"sp": identity, "sp_shift": shifted}).sort_index()
+    out["shift_drop"] = out.sp - out.sp_shift
+    return out
+
+
+def method_estimates(
+    summaries: pd.DataFrame,
+    xp: pd.DataFrame,
+    env: str,
+    methods=METHOD_ORDER,
+    shift: pd.DataFrame | None = None,
+) -> dict[str, dict[str, Estimate]]:
     """Per-method estimates for one environment.
 
     sp       self-play return (diagonal of the cross-play matrix: same seeds,
@@ -53,6 +74,8 @@ def method_estimates(summaries: pd.DataFrame, xp: pd.DataFrame, env: str, method
     gap      sp - xp, bootstrapped jointly over seeds
     perm_js  permutation sensitivity on self-play evaluation states
     flip     fraction of (state, permutation) pairs whose greedy action changes
+    shift_drop  (with ``shift``) self-play minus self-play when every agent sees
+                its teammates in a different order; paired over the same episodes
     """
     out = {}
     for i, method in enumerate(methods):
@@ -70,6 +93,9 @@ def method_estimates(summaries: pd.DataFrame, xp: pd.DataFrame, env: str, method
             "perm_js": bootstrap_mean(runs.perm_js.to_numpy(), seed=i),
             "flip": bootstrap_mean(runs.perm_flip_rate.to_numpy(), seed=i),
         }
+        if shift is not None:
+            per_run = order_shift_per_run(shift, method)
+            out[method]["shift_drop"] = bootstrap_mean(per_run.shift_drop.to_numpy(), seed=i)
     return out
 
 
@@ -93,6 +119,7 @@ def compare_to(
     env: str,
     baseline: str = "ippo",
     n_perm: int = 10_000,
+    shift: pd.DataFrame | None = None,
 ) -> dict[str, dict[str, dict[str, float]]]:
     """Each method minus the baseline: point difference, bootstrap 95% CI and permutation p-value."""
     out = {}
@@ -103,6 +130,8 @@ def compare_to(
         matrix = np.block([[crossplay_block(xp, ego, partner) for partner in order] for ego in order])
         runs = pd.concat([summaries[(summaries.env == env) & (summaries.variant == m)].sort_values("seed") for m in order])
         per_run = {"perm_js": runs.perm_js.to_numpy(), "flip": runs.perm_flip_rate.to_numpy()}
+        if shift is not None:
+            per_run["shift_drop"] = np.concatenate([order_shift_per_run(shift, m).shift_drop.to_numpy() for m in order])
         n_a = int((runs.variant == method).sum())
         p_values = permutation_test(matrix, per_run, n_a, n_perm=n_perm)
         out[method] = {name: {**difference(metrics[name], estimates[baseline][name]), "p": p_values[name]} for name in metrics}

@@ -75,3 +75,32 @@ def evaluate_ego(ego: RunRef, partners: list[RunRef], episodes: int, adversaries
             }
         )
     return rows
+
+
+def evaluate_order_shift(run: RunRef, episodes: int, adversaries: list[RunRef] = ()) -> list[dict]:
+    """Self-play of one run under every teammate ordering, identity included.
+
+    Uses the same evaluation seeds, sampling seed and adversary pool as
+    cross-play, so the identity row equals the cross-play diagonal and the
+    drop under a permutation is a paired comparison.
+    """
+    spec = make_env(run.env).spec
+    policy = load_policy(run.path / "policy.pt")
+    adversary = [load_policy(r.path / "adversary.pt") for r in adversaries] or None
+    rows = []
+    for perm in spec.slicing.all_permutations(include_identity=True):
+        returns = play_episodes(
+            run.env, [policy] * spec.n_team, adversary, eval_seeds(episodes), sample_seed=0, teammate_permutation=perm
+        )
+        rows.append(
+            {
+                "env": run.env,
+                "method": run.method,
+                "seed": run.seed,
+                "permutation": "-".join(map(str, perm)),
+                "identity": perm == tuple(range(len(perm))),
+                "return_mean": float(returns["returns"].mean()),
+                "episodes": episodes,
+            }
+        )
+    return rows

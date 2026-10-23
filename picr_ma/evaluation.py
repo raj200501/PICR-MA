@@ -30,11 +30,16 @@ def play_episodes(
     sample_seed: int = 0,
     greedy: bool = False,
     collect_obs: bool = False,
+    teammate_permutation: tuple[int, ...] | None = None,
 ) -> dict[str, np.ndarray]:
     """Roll out one episode per seed (in parallel); team slot ``i`` is controlled by ``team[i]``.
 
     ``adversary`` may be a list of policies, in which case episode ``i`` is played
     against ``adversary[i % len(adversary)]``.
+
+    ``teammate_permutation`` reorders the teammate blocks of every team
+    observation before the policies see it (an "order shift": the same state,
+    described with teammates listed in a different order).
 
     Returns per-episode team returns (sum over time of the mean team reward) and
     optionally the visited team observations, flattened to (episodes*T*N, D).
@@ -53,9 +58,13 @@ def play_episodes(
     visited = []
     done = False
     while not done:
+        team_obs = obs["team"]
+        if teammate_permutation is not None:
+            flat = permute_teammates(team_obs.reshape(-1, spec.obs_dim), spec.slicing, np.asarray(teammate_permutation))
+            team_obs = flat.reshape(team_obs.shape)
         if collect_obs:
-            visited.append(obs["team"].reshape(-1, spec.obs_dim))
-        actions = np.stack([policy.act(obs["team"][:, slot], generator, greedy)[0] for slot, policy in enumerate(team)], axis=1)
+            visited.append(team_obs.reshape(-1, spec.obs_dim))
+        actions = np.stack([policy.act(team_obs[:, slot], generator, greedy)[0] for slot, policy in enumerate(team)], axis=1)
         adv_actions = None
         if spec.n_adversaries:
             adv_actions = np.empty((len(seeds), spec.n_adversaries), dtype=np.int64)

@@ -13,7 +13,7 @@ def main_table(estimates_by_env: dict) -> str:
     lines = [
         r"\begin{tabular}{llccccc}",
         r"\toprule",
-        r"Env. & Method & Self-play $\uparrow$ & Cross-play $\uparrow$ & SP$-$XP gap $\downarrow$ & Perm.\ JS ($\times 10^{-3}$) $\downarrow$ & Flip rate $\downarrow$ \\",
+        r"Env. & Method & Self-play $\uparrow$ & Cross-play $\uparrow$ & SP$-$XP gap $\downarrow$ & Perm.\ JS ($\times 10^{-3}$) $\downarrow$ & Order-shift drop $\downarrow$ \\",
         r"\midrule",
     ]
     for k, (env, est) in enumerate(estimates_by_env.items()):
@@ -21,9 +21,10 @@ def main_table(estimates_by_env: dict) -> str:
             lines.append(r"\midrule")
         for method in [m for m in METHOD_ORDER if m in est]:
             e = est[method]
+            shift = _ci(e["shift_drop"]) if "shift_drop" in e else "--"
             lines.append(
                 f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & {_ci(e['sp'])} & {_ci(e['xp'])} & {_ci(e['gap'])} & "
-                f"{_ci(e['perm_js'], '{:.1f}', 1e3)} & {_ci(e['flip'], '{:.2f}')} \\\\"
+                f"{_ci(e['perm_js'], '{:.1f}', 1e3)} & {shift} \\\\"
             )
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines) + "\n"
@@ -34,10 +35,17 @@ def _p(p: float) -> str:
 
 
 def comparison_table(comparisons_by_env: dict) -> str:
+    columns = [("xp", 1, "{:+.2f}", r"$\Delta$ Cross-play"), ("gap", 1, "{:+.2f}", r"$\Delta$ SP$-$XP gap")]
+    columns += [
+        ("perm_js", 1e3, "{:+.1f}", r"$\Delta$ Perm.\ JS ($\times 10^{-3}$)"),
+        ("shift_drop", 1, "{:+.2f}", r"$\Delta$ Order-shift drop"),
+    ]
+    first = next(iter(comparisons_by_env.values()))
+    columns = [c for c in columns if all(c[0] in m for m in first.values())]
     lines = [
-        r"\begin{tabular}{llccc}",
+        r"\begin{tabular}{ll" + "c" * len(columns) + "}",
         r"\toprule",
-        r"Env. & Method & $\Delta$ Cross-play & $\Delta$ SP$-$XP gap & $\Delta$ Perm.\ JS ($\times 10^{-3}$) \\",
+        "Env. & Method & " + " & ".join(c[3] for c in columns) + r" \\",
         r"\midrule",
     ]
     for k, (env, comp) in enumerate(comparisons_by_env.items()):
@@ -45,7 +53,7 @@ def comparison_table(comparisons_by_env: dict) -> str:
             lines.append(r"\midrule")
         for method in [m for m in METHOD_ORDER if m in comp]:
             cells = []
-            for key, scale, fmt in [("xp", 1, "{:+.2f}"), ("gap", 1, "{:+.2f}"), ("perm_js", 1e3, "{:+.1f}")]:
+            for key, scale, fmt, _ in columns:
                 d = comp[method][key]
                 cells.append(
                     f"{fmt.format(scale * d['diff'])} \\scriptsize{{[{fmt.format(scale * d['ci_lo'])}, {fmt.format(scale * d['ci_hi'])}], $p$={_p(d['p'])}}}"
@@ -57,15 +65,17 @@ def comparison_table(comparisons_by_env: dict) -> str:
 
 def markdown_table(estimates_by_env: dict) -> str:
     rows = [
-        "| Env | Method | Self-play ↑ | Cross-play ↑ | SP−XP gap ↓ | Perm. JS (×10⁻³) ↓ |",
-        "|---|---|---|---|---|---|",
+        "| Env | Method | Self-play ↑ | Cross-play ↑ | SP−XP gap ↓ | Perm. JS (×10⁻³) ↓ | Order-shift drop ↓ |",
+        "|---|---|---|---|---|---|---|",
     ]
+    fmt = lambda x, s=1.0, f="{:.2f}": f"{f.format(s * x.mean)} [{f.format(s * x.lo)}, {f.format(s * x.hi)}]"  # noqa: E731
     for env, est in estimates_by_env.items():
         for method in [m for m in METHOD_ORDER if m in est]:
             e = est[method]
-            fmt = lambda x, s=1.0, f="{:.2f}": f"{f.format(s * x.mean)} [{f.format(s * x.lo)}, {f.format(s * x.hi)}]"  # noqa: E731
+            shift = fmt(e["shift_drop"]) if "shift_drop" in e else "–"
             rows.append(
-                f"| {ENV_LABELS.get(env, env)} | {METHOD_LABELS[method]} | {fmt(e['sp'])} | {fmt(e['xp'])} | {fmt(e['gap'])} | {fmt(e['perm_js'], 1e3, '{:.1f}')} |"
+                f"| {ENV_LABELS.get(env, env)} | {METHOD_LABELS[method]} | {fmt(e['sp'])} | {fmt(e['xp'])} | {fmt(e['gap'])} | "
+                f"{fmt(e['perm_js'], 1e3, '{:.1f}')} | {shift} |"
             )
     return "\n".join(rows) + "\n"
 
@@ -98,6 +108,7 @@ METRIC_MACRO = {
     "gap": ("Gap", 1.0, "{:.2f}"),
     "perm_js": ("JS", 1e3, "{:.1f}"),
     "flip": ("Flip", 1.0, "{:.2f}"),
+    "shift_drop": ("Shift", 1.0, "{:.2f}"),
 }
 
 
@@ -118,12 +129,16 @@ def numbers_tex(estimates_by_env: dict, comparisons_by_env: dict, report: dict) 
         for method, metrics in est.items():
             m_name = METHOD_MACRO[method]
             for key, (k_name, scale, fmt) in METRIC_MACRO.items():
+                if key not in metrics:
+                    continue
                 x = metrics[key]
                 define(f"{e_name}{m_name}{k_name}", _num(scale * x.mean, fmt))
                 define(f"{e_name}{m_name}{k_name}ci", f"[{fmt.format(scale * x.lo)}, {fmt.format(scale * x.hi)}]")
         for method, comp in comparisons_by_env.get(env, {}).items():
             m_name = METHOD_MACRO[method]
             for key, (k_name, scale, fmt) in METRIC_MACRO.items():
+                if key not in comp:
+                    continue
                 d = comp[key]
                 define(f"{e_name}{m_name}d{k_name}", _num(scale * d["diff"], fmt, signed=True))
                 define(f"{e_name}{m_name}d{k_name}ci", f"[{fmt.format(scale * d['ci_lo'])}, {fmt.format(scale * d['ci_hi'])}]")

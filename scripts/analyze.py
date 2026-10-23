@@ -24,6 +24,7 @@ from picr_ma.analysis.aggregate import (
     crossplay_block,
     load_crossplay,
     load_curves,
+    load_order_shift,
     load_summaries,
     method_estimates,
     method_matrix,
@@ -107,8 +108,9 @@ def main() -> None:
     estimates, comparisons, curves, per_run, matrices = {}, {}, {}, {}, {}
     for env in envs:
         xp = load_crossplay(main_dir, env)
-        estimates[env] = method_estimates(summaries, xp, env)
-        comparisons[env] = compare_to(estimates[env], summaries, xp, env)
+        shift = load_order_shift(main_dir, env)
+        estimates[env] = method_estimates(summaries, xp, env, shift=shift)
+        comparisons[env] = compare_to(estimates[env], summaries, xp, env, shift=shift)
         curves[env] = load_curves(main_dir, env)
         per_run[env] = per_run_table(summaries, xp, env)
         matrices[env] = method_matrix(xp)
