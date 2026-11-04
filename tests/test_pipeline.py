@@ -56,6 +56,8 @@ def _run(script: str, *args) -> str:
 @pytest.mark.slow
 def test_full_pipeline(tmp_path):
     results, paper, config = tmp_path / "results", tmp_path / "paper", tmp_path / "experiments.yaml"
+    (results / "tuning").mkdir(parents=True)
+    (results / "tuning" / "ippo_sweep.jsonl").write_text((ROOT / "results" / "tuning" / "ippo_sweep.jsonl").read_text())
     (paper / "figures").mkdir(parents=True)
     config.write_text(yaml.safe_dump(CONFIG))
     common = ["--results-dir", results]
@@ -94,6 +96,8 @@ def test_full_pipeline(tmp_path):
         "SpreadSlopePos",
         "ComputeMainHours",
         "SpreadDeepSetsActorParams",
+        "SpreadIPPOSPsd",
+        "TuneAdversaryOther",
     ]:
         assert f"\\newcommand{{\\{macro}}}" in numbers, macro
     # Every generated macro the paper uses is defined.
@@ -102,7 +106,7 @@ def test_full_pipeline(tmp_path):
         m
         for tex in (ROOT / "paper").glob("**/*.tex")
         if "tables" not in tex.parts
-        for m in re.findall(r"\\((?:Spread|Adversary|Long|Ref|PC|EnvSpeedup)\w*)", tex.read_text())
+        for m in re.findall(r"\\((?:Spread|Adversary|Long|Ref|PC|EnvSpeedup|Tune|Compute)\w*)", tex.read_text())
     }
     assert used <= defined, sorted(used - defined)
     for table in ["main_results", "comparison", "order_measures", "overhead", "long_budget", "lambda_sweep", "compute"]:

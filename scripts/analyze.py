@@ -34,7 +34,9 @@ from picr_ma.analysis.aggregate import (
 )
 from picr_ma.analysis.stats import bootstrap_mean, bootstrap_pairs
 from picr_ma.experiments import expand_suite, load_suites
+from picr_ma.ppo import PPOConfig
 from picr_ma.provenance import provenance
+from picr_ma.train import TrainConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 # Inputs produced by the evaluation stages, and the make target that produces each.
@@ -138,6 +140,21 @@ def late_training_slope(curves: pd.DataFrame, window: float = 1e6) -> dict[str, 
     return out
 
 
+def tuning_record(path: Path) -> dict:
+    """Self-play of the chosen configuration and of the alternatives in the IPPO sweep (results/tuning).
+
+    The chosen configuration is the code's default (PPOConfig and TrainConfig defaults are the tuned values).
+    """
+    ppo, num_envs = PPOConfig(), TrainConfig.__dataclass_fields__["num_envs"].default
+    chosen_tag = f"_ippo_lr{ppo.lr:g}_ep{ppo.epochs}_mb{ppo.minibatches}_ne{num_envs}_ent{ppo.ent_coef:g}_s1000_"
+    out = {}
+    for line in path.read_text().splitlines():
+        run = json.loads(line)
+        key = f"{run['env']}/{round(run['env_steps'] / 1e6)}M/" + ("chosen" if chosen_tag in run["tag"] else run["tag"])
+        out[key] = run["self_play_return"]
+    return out
+
+
 def lambda_table(suite_dir: Path) -> pd.DataFrame:
     summaries = load_summaries(suite_dir)
     rows = []
@@ -216,7 +233,13 @@ def main() -> None:
         "within_method_spearman_perm_js_vs_compatibility": {env: within_method_spearman(per_run[env]) for env in envs},
         "additive_decomposition": {env: additive_decomposition(crossplays[env]) for env in envs},
         "late_training_slope": {env: late_training_slope(curves[env]) for env in envs},
+        "seed_sd_self_play": {
+            env: {m: float(np.diag(crossplay_block(crossplays[env], m, m)).std(ddof=1)) for m in estimates[env]} for env in envs
+        },
     }
+    tuning = args.results_dir / "tuning" / "ippo_sweep.jsonl"
+    if tuning.exists():
+        report["tuning"] = tuning_record(tuning)
     report["selected_lambda"] = check_selected_lambda(summaries, args.results_dir / "lambda" / "selection.json")
     for name in ("reference_returns", "overhead", "positive_control", "env_speed"):
         report[name] = json.loads((args.results_dir / f"{name}.json").read_text())

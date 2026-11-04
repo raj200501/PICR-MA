@@ -271,6 +271,20 @@ def _report_macros(define, report: dict) -> None:
         define(f"{ENV_MACRO[env]}SlopeHi", _num(max(means)))
         define(f"{ENV_MACRO[env]}SlopePos", str(sum(s["n_positive"] for s in by_method.values())))
         define(f"{ENV_MACRO[env]}SlopeN", str(sum(s["n"] for s in by_method.values())))
+    for env, by_method in report.get("seed_sd_self_play", {}).items():
+        for method, sd in by_method.items():
+            define(f"{ENV_MACRO[env]}{METHOD_MACRO[method]}SPsd", _num(sd))
+    tuning = report.get("tuning", {})
+    for key, name in [
+        ("simple_spread_v3/3M/chosen", "TuneSpreadChosen"),
+        ("simple_spread_v3/6M/chosen", "TuneSpreadLonger"),
+        ("simple_adversary_v3/3M/chosen", "TuneAdversaryChosen"),
+    ]:
+        if key in tuning:
+            define(name, _num(tuning[key]))
+    others = [v for k, v in tuning.items() if k.startswith("simple_adversary_v3/3M/") and not k.endswith("/chosen")]
+    if len(others) == 1:
+        define("TuneAdversaryOther", _num(others[0]))
     for suite, record in report.get("compute", {}).items():
         define(f"Compute{suite.capitalize()}Hours", f"{record['total_hours']:.0f}")
     for env, entry in report.get("overhead", {}).get("envs", {}).items():

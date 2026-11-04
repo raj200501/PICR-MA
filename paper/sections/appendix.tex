@@ -1,17 +1,67 @@
 \section{Hyperparameter tuning}
 \label{app:tuning}
 
-All four methods share one PPO configuration, tuned for IPPO alone on
-\texttt{simple\_spread} with a separate tuning seed (1000) and checked on
-\texttt{simple\_adversary}. Selection used self-play return on the reserved
-evaluation episodes. We varied the learning rate ($3{\times}10^{-4}$ to
+All methods share one PPO configuration, tuned for IPPO alone on
+\texttt{simple\_spread} with a separate tuning seed (1000). The criterion was
+self-play return on the first 500 test-range evaluation episodes, which include
+the 240 test episodes used for every reported return; only IPPO runs on the
+tuning seed were scored. We varied the learning rate ($3{\times}10^{-4}$ to
 $2{\times}10^{-3}$), epochs per update (5--15), minibatches (4--16), episodes per
 update (32--256) and the entropy coefficient (0 or 0.01); the full table is in
-\texttt{docs/tuning.md}. Each configuration was run with a single seed, so
-differences of 1--2 return points are within seed-to-seed noise. The chosen
-configuration (learning rate $10^{-3}$, 10 epochs, 8 minibatches, 128 episodes
-per update, entropy 0.01) reached a training return still improving slowly at
-$5\times10^{6}$ steps.
+\texttt{docs/tuning.md}. Each configuration was run with a single seed. With
+the chosen configuration, the standard deviation of IPPO's self-play return
+across the ten main seeds is \SpreadIPPOSPsd{} on \texttt{simple\_spread}, so
+the sweep can only rule out configurations that are clearly worse; its top six
+configurations are within noise of each other, and the chosen configuration's
+tuning run (\TuneSpreadChosen{} after $3\times10^6$ steps) was a favourable
+seed. On \texttt{simple\_adversary}, the configuration tuned on
+\texttt{simple\_spread} scored \TuneAdversaryChosen{} against
+\TuneAdversaryOther{} for the earlier default (single seeds, each against its
+own adversary; seed standard deviation \AdversaryIPPOSPsd{} in the main
+suite), so it may be slightly suboptimal for that environment. Every \texttt{simple\_spread} run was still
+improving at the $5\times10^6$-step budget: over the last million steps the
+training return rose in \SpreadSlopePos{} of \SpreadSlopeN{} runs, with method
+means from \SpreadSlopeLo{} to \SpreadSlopeHi{} return points per million steps.
+On \texttt{simple\_adversary} the training return, measured against each run's
+co-trained adversary, was flat (method means from \AdversarySlopeLo{} to
+\AdversarySlopeHi{}; \AdversarySlopePos{} of \AdversarySlopeN{} runs rising).
+
+\section{The weight sweep as a dose-response test}
+\label{app:lambda}
+
+\begin{table}[h]
+\centering
+\caption{The $\lambda$ sweep on the selection seeds (100--104, five runs per
+row), scored on the validation episodes. IPPO trained on the same seeds is the
+$\lambda=0$ end point; it was added after the main \texttt{simple\_spread}
+results had been seen and was not a selection candidate. Intervals are 95\%
+bootstrap intervals over runs.}
+\label{tab:lambda}
+\resizebox{\linewidth}{!}{\input{tables/lambda_sweep.tex}}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/lambda_sweep.pdf}
+\caption{Permutation sensitivity (top, log scale) and self-play and cross-play
+return (bottom) against the \picr{} weight, with IPPO at $\lambda=0$; mean and
+95\% bootstrap interval over five runs, validation episodes.}
+\label{fig:lambda}
+\end{figure}
+
+\section{Twice the training budget}
+\label{app:long}
+
+\begin{table}[h]
+\centering
+\caption{\texttt{simple\_spread} with $10^7$ environment steps per run (five new
+seeds, 20--24, per method; test episodes; \picr{} with the selected weight).
+The last column is the difference in SP$-$XP gap from IPPO with its
+permutation-test $p$-value. This check was added after the main
+\texttt{simple\_spread} results had been seen.}
+\label{tab:long}
+\resizebox{\linewidth}{!}{\input{tables/long_budget.tex}}
+\end{table}
 
 \section{Environment re-implementation}
 \label{app:env}
@@ -23,11 +73,28 @@ adversary, shaped distance rewards), with discrete actions and 25-step
 episodes. Resets reproduce the reference random-number draws exactly. The test
 suite steps both implementations side by side under random actions from
 several seeds and checks that observations agree to $10^{-5}$ and rewards to
-$10^{-6}$ at every step. In \texttt{simple\_spread} the agents are silent, so
-the two communication entries in each teammate block are always zero.
+$10^{-6}$ at every step. Stepping 128 episodes at a time, the batched
+\texttt{simple\_spread} runs about $\EnvSpeedup\times$ more environment steps
+per second than \texttt{mpe2} stepping one environment at a time
+(\texttt{scripts/benchmark\_env.py}). In \texttt{simple\_spread} the agents are
+silent, so the two communication entries in each teammate block are always
+zero.
 
-\section{Order sensitivity of the trained policies}
+\section{Order measures}
 \label{app:sensitivity}
+
+\begin{table}[h]
+\centering
+\caption{Every order-related measure on the test episodes, including the
+controls: greedy-action flip rate under teammate permutations; slot contrast
+(cross-play with the ego listed first by both partners minus listed second);
+self-play return lost under the genuine (cyclic) order patterns, under the
+relabeling patterns (zero in expectation for any policy) and with teammate
+features resampled from other episodes. Means over runs with 95\% bootstrap
+intervals.}
+\label{tab:order}
+\resizebox{\linewidth}{!}{\input{tables/order_measures.tex}}
+\end{table}
 
 \begin{figure}[h]
 \centering
@@ -48,8 +115,21 @@ own co-trained adversary and is therefore not comparable across methods.}
 \caption{Cost of one PPO update (128 episodes, 10 epochs of 8 minibatches) and
 of one batched forward pass at inference time, measured in a single process on
 one CPU thread on identical synthetic batches (median of 5 and 200 repeats).
-\picr{} and IPPO deploy the same network. Order augmentation permutes inputs
-while acting, so its update cost equals IPPO's by construction.}
+\picr{} uses each environment's selected weight. \picr{} and IPPO deploy the
+same network. Order augmentation and randomization permute inputs while acting,
+so their update cost equals IPPO's by construction.}
 \label{tab:cost}
 \resizebox{\linewidth}{!}{\input{tables/overhead.tex}}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Training wall-clock per run, in minutes (median and range). Each run
+is one single-threaded process, and several runs shared each 4-core cloud
+machine, so the times include contention and depend on what else was running.
+Total training:
+\ComputeLambdaHours{} hours for the $\lambda$ sweep, \ComputeMainHours{} for the
+main comparison and \ComputeLongHours{} for the budget check.}
+\label{tab:compute}
+\resizebox{\linewidth}{!}{\input{tables/compute.tex}}
 \end{table}
