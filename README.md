@@ -111,6 +111,13 @@ make paper          # tables, figures, numbers and PDF from the committed result
 make reproduce      # retrain and re-evaluate everything, then build the paper
 ```
 
+To check any single number in the cross-play tables against the committed
+policies, score two runs together (about a minute on one core):
+
+```bash
+python scripts/pair.py results/main/simple_spread_v3/ippo/seed0 results/main/simple_spread_v3/picr/seed3
+```
+
 `make reproduce` trains 175 runs (60 for choosing λ, 100 for the main
 comparison, 15 for the budget check). Each run is one single-threaded process
 of roughly 7–30 minutes, so the whole study takes about half a day on a 4-core

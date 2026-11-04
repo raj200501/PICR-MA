@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 
@@ -116,6 +117,20 @@ def test_full_pipeline(tmp_path):
     assert report["provenance"]["git_commit"] and set(report["compute"]) == {"main", "lambda", "long"}
     assert json.loads((results / "main" / "simple_spread_v3" / "crossplay.provenance.json").read_text())["split"] == "test"
     assert (tmp_path / "png" / "order_shift.png").exists()
+
+    # scripts/pair.py reproduces the cross-play rows of any pair, including the shared adversary pool.
+    for env, a, b in [("simple_spread_v3", "ippo/seed0", "picr/seed1"), ("simple_adversary_v3", "deepsets/seed2", "ippo/seed0")]:
+        env_dir = results / "main" / env
+        rows = json.loads(_run("pair.py", env_dir / a, env_dir / b, "--episodes", 8, "--json"))
+        xp = pd.read_csv(env_dir / "crossplay.csv")
+        for row in rows:
+            match = xp[
+                (xp.ego_method == row["ego_method"])
+                & (xp.ego_seed == row["ego_seed"])
+                & (xp.partner_method == row["partner_method"])
+                & (xp.partner_seed == row["partner_seed"])
+            ]
+            assert len(match) == 1 and match.return_mean.item() == pytest.approx(row["return_mean"], abs=1e-9)
 
     # An evaluation output missing from results/ is an error, not a silently skipped table.
     (results / "overhead.json").rename(results / "overhead.moved")
