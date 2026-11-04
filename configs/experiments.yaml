@@ -38,6 +38,6 @@ suites:
   # lambda-suite seeds (rule fixed before the lambda suite was run).
   main:
     envs: [simple_spread_v3, simple_adversary_v3]
-    methods: [ippo, picr, deepsets, order_aug]
+    methods: [ippo, picr, deepsets, order_aug, order_rand]
     picr_lambda_by_env: {simple_spread_v3: 0.01, simple_adversary_v3: 0.3}  # from results/lambda/selection.json
     seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]

@@ -2,11 +2,20 @@
 
 Methods (all share the same PPO learner and hyperparameters):
 
-* ``ippo``      - shared-parameter IPPO with an MLP policy.
-* ``picr``      - IPPO + the PICR consistency penalty (training-time only).
-* ``deepsets``  - IPPO with a teammate-permutation-invariant Deep Sets encoder.
-* ``order_aug`` - IPPO where each policy input has its teammate blocks randomly
-                  permuted (data augmentation over the observation symmetry).
+* ``ippo``       - shared-parameter IPPO with an MLP policy.
+* ``picr``       - IPPO + the PICR consistency penalty (training-time only).
+* ``deepsets``   - IPPO with a teammate-permutation-invariant Deep Sets encoder.
+* ``order_aug``  - IPPO where, while acting during training, every agent's
+                   teammate blocks are freshly permuted at every step and the
+                   permuted inputs are what PPO trains on. Returns then depend
+                   only on the order-averaged policy, so nothing rewards
+                   agreement across orderings.
+* ``order_rand`` - Other-Play-style randomization: one random teammate ordering
+                   per agent, drawn at reset and held for the whole episode, so
+                   teams must coordinate while their members use different but
+                   consistent conventions.
+
+Deployment always uses the canonical (index) teammate order.
 
 Each PPO update uses ``num_envs`` complete episodes collected in parallel.
 Artifacts written to ``out_dir``: config.json, metrics.csv.gz (one row per
@@ -33,7 +42,7 @@ from picr_ma.evaluation import EVAL_SEED_OFFSET, evaluate_self_play, permutation
 from picr_ma.networks import ActorCritic, save_policy
 from picr_ma.ppo import PPOConfig, compute_gae, ppo_update
 
-METHODS = ("ippo", "picr", "deepsets", "order_aug")
+METHODS = ("ippo", "picr", "deepsets", "order_aug", "order_rand")
 
 
 @dataclass
@@ -41,8 +50,8 @@ class TrainConfig:
     env: str
     method: str
     seed: int
-    total_steps: int = 3_000_000
-    num_envs: int = 64
+    total_steps: int = 5_000_000
+    num_envs: int = 128
     hidden: int = 64
     picr_lambda: float = 0.1
     eval_episodes: int = 500
@@ -67,9 +76,13 @@ def run_seed_sequence(config: TrainConfig) -> np.random.SeedSequence:
     return np.random.SeedSequence([config.seed, zlib.crc32(config.method.encode()), int(round(lam * 1e6))])
 
 
-def _policy_input(method: str, obs: np.ndarray, slicing, rng: np.random.Generator) -> np.ndarray:
-    if method == "order_aug" and slicing.n_teammates > 1:
-        return permute_teammates(obs, slicing, random_permutations(len(obs), slicing.n_teammates, rng))
+def _policy_input(method: str, obs: np.ndarray, slicing, rng: np.random.Generator, episode_perms=None) -> np.ndarray:
+    """The observation each agent's policy sees while acting during training (rows: env x agent)."""
+    if slicing.n_teammates > 1:
+        if method == "order_aug":
+            return permute_teammates(obs, slicing, random_permutations(len(obs), slicing.n_teammates, rng))
+        if method == "order_rand":
+            return permute_teammates(obs, slicing, episode_perms)
     return obs
 
 
@@ -133,10 +146,14 @@ def train(config: TrainConfig, out_dir: str | Path) -> dict:
         team = {k: [] for k in ("obs", "actions", "log_probs", "values", "rewards")}
         adv = {k: [] for k in team}
         episode_return = np.zeros(config.num_envs)
+        episode_perms = None
+        if config.method == "order_rand":
+            episode_perms = random_permutations(config.num_envs * spec.n_team, spec.slicing.n_teammates, rng)
         done = False
         while not done:
             b, n, d = obs["team"].shape
-            policy_obs = _policy_input(config.method, obs["team"].reshape(b * n, d), spec.slicing, rng).reshape(b, n, d)
+            flat_obs = obs["team"].reshape(b * n, d)
+            policy_obs = _policy_input(config.method, flat_obs, spec.slicing, rng, episode_perms).reshape(b, n, d)
             actions, log_probs, values = _act(policy, policy_obs, generator)
             adv_actions = None
             if adversary is not None:

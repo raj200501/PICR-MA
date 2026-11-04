@@ -45,3 +45,34 @@ def test_minimizing_picr_loss_makes_mlp_invariant():
     final = picr_loss(model.logits, obs, SLICING, np.random.default_rng(1)).item()
     assert initial > 1e-2
     assert final < 0.02 * initial
+
+
+def test_ppo_update_with_picr_reduces_the_penalty_relative_to_ppo_alone():
+    """Catches a sign error or a penalty that never reaches the gradient."""
+    import copy
+
+    from picr_ma.ppo import PPOConfig, ppo_update
+
+    rng = np.random.default_rng(0)
+    n = 512
+    batch = {
+        "obs": rng.normal(size=(n, 10)).astype(np.float32),
+        "actions": rng.integers(0, 5, n),
+        "log_probs": np.full(n, -np.log(5), dtype=np.float32),
+        "advantages": rng.normal(size=n).astype(np.float32),
+        "returns": rng.normal(size=n).astype(np.float32),
+    }
+    torch.manual_seed(0)
+    start = ActorCritic(10, 5)
+    start.policy_head.weight.data.normal_()
+    probe = torch.as_tensor(batch["obs"])
+
+    def penalty_after(lam: float) -> float:
+        model = copy.deepcopy(start)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, eps=1e-5)
+        ppo_update(
+            model, optimizer, batch, PPOConfig(epochs=4, minibatches=2, picr_lambda=lam), np.random.default_rng(1), SLICING
+        )
+        return picr_loss(model.logits, probe, SLICING, np.random.default_rng(2)).item()
+
+    assert penalty_after(10.0) < 0.5 * penalty_after(0.0)

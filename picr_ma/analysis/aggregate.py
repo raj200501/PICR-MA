@@ -49,15 +49,22 @@ def load_order_shift(suite_dir: str | Path, env: str) -> pd.DataFrame | None:
     return pd.read_csv(path) if path.exists() else None
 
 
+SHIFT_METRICS = ("shift_drop", "relabel_drop", "resample_drop")
+
+
 def order_shift_per_run(shift: pd.DataFrame, method: str) -> pd.DataFrame:
-    """Per run (sorted by seed): self-play under identity order, under shifted orders, and with teammates ablated."""
+    """Per run (sorted by seed): self-play return lost under each kind of teammate-order condition.
+
+    shift_drop     genuine order shifts (views no relabeling of the agents produces)
+    relabel_drop   relabeling patterns: zero in expectation for any shared policy, a noise floor
+    resample_drop  teammate features replaced with another episode's: reliance on teammates at all
+    """
     rows = shift[shift.method == method]
-    by_kind = lambda kind: rows[rows.kind == kind].groupby("seed").return_mean.mean()  # noqa: E731
-    out = pd.DataFrame(
-        {"sp": by_kind("identity"), "sp_shift": by_kind("permuted"), "sp_ablated": by_kind("ablated")}
-    ).sort_index()
-    out["shift_drop"] = out.sp - out.sp_shift
-    out["ablation_drop"] = out.sp - out.sp_ablated
+    by_kind = rows.groupby(["seed", "kind"]).return_mean.mean().unstack()
+    out = pd.DataFrame({"sp": by_kind["identity"]}).sort_index()
+    out["shift_drop"] = out.sp - by_kind["genuine"]
+    out["relabel_drop"] = out.sp - by_kind["relabeling"]
+    out["resample_drop"] = out.sp - by_kind["resampled"]
     return out
 
 
@@ -76,10 +83,10 @@ def method_estimates(
     gap      sp - xp, bootstrapped jointly over seeds
     perm_js  permutation sensitivity on self-play evaluation states
     flip     fraction of (state, permutation) pairs whose greedy action changes
-    shift_drop     (with ``shift``) self-play minus self-play when every agent sees
-                   its teammates in a different order; paired over the same episodes
-    ablation_drop  (with ``shift``) self-play minus self-play with all teammate
-                   features zeroed: a control for how much teammates matter at all
+    shift_drop, relabel_drop, resample_drop
+             (with ``shift``) self-play return lost under genuine order shifts,
+             under relabeling patterns (a null control) and with teammate
+             features resampled; see ``order_shift_per_run``
     """
     out = {}
     for i, method in enumerate(methods):
@@ -99,8 +106,8 @@ def method_estimates(
         }
         if shift is not None:
             per_run = order_shift_per_run(shift, method)
-            out[method]["shift_drop"] = bootstrap_mean(per_run.shift_drop.to_numpy(), seed=i)
-            out[method]["ablation_drop"] = bootstrap_mean(per_run.ablation_drop.to_numpy(), seed=i)
+            for key in SHIFT_METRICS:
+                out[method][key] = bootstrap_mean(per_run[key].to_numpy(), seed=i)
     return out
 
 
@@ -137,8 +144,8 @@ def compare_to(
         per_run = {"perm_js": runs.perm_js.to_numpy(), "flip": runs.perm_flip_rate.to_numpy()}
         if shift is not None:
             shifts = [order_shift_per_run(shift, m) for m in order]
-            per_run["shift_drop"] = np.concatenate([x.shift_drop.to_numpy() for x in shifts])
-            per_run["ablation_drop"] = np.concatenate([x.ablation_drop.to_numpy() for x in shifts])
+            for key in SHIFT_METRICS:
+                per_run[key] = np.concatenate([x[key].to_numpy() for x in shifts])
         n_a = int((runs.variant == method).sum())
         p_values = permutation_test(matrix, per_run, n_a, n_perm=n_perm)
         out[method] = {name: {**difference(metrics[name], estimates[baseline][name]), "p": p_values[name]} for name in metrics}

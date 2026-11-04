@@ -28,16 +28,9 @@ import numpy as np
 
 from picr_ma.envs.mpe import make_env
 from picr_ma.evaluation import eval_seeds
+from picr_ma.scripted import steer
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def _steer(rel: np.ndarray, vel: np.ndarray) -> np.ndarray:
-    """Discrete action that pushes along the dominant axis of (target - 0.5 * velocity)."""
-    target = rel - 0.5 * vel
-    horizontal = np.abs(target[..., 0]) > np.abs(target[..., 1])
-    action = np.where(horizontal, np.where(target[..., 0] > 0, 2, 1), np.where(target[..., 1] > 0, 4, 3))
-    return np.where(np.abs(target).max(axis=-1) < 0.02, 0, action)
 
 
 def run(controller: str, episodes: int, seed: int = 0) -> np.ndarray:
@@ -56,7 +49,7 @@ def run(controller: str, episodes: int, seed: int = 0) -> np.ndarray:
             actions = np.zeros((episodes, 3), dtype=np.int64)
         else:
             target = env.landmarks[np.arange(episodes)[:, None], assignment]
-            actions = _steer(target - env.pos, env.vel)
+            actions = steer(target - env.pos, env.vel)
         _, rewards, _, done = env.step(actions)
         returns += rewards.mean(axis=1)
     return returns

@@ -1,8 +1,9 @@
 """Self-play, cross-play and permutation-sensitivity evaluation.
 
-All evaluations reset environments from the same fixed list of seeds
-(``eval_seeds``), which training never uses, so every policy and every pairing
-is scored on identical start states (common random numbers).
+Evaluations reset environments from fixed lists of seeds that training never
+uses (``eval_seeds``), so every policy and every pairing is scored on identical
+start states (common random numbers). The ``validation`` episodes are used to
+select the PICR weight; the ``test`` episodes are used for the reported results.
 """
 
 from __future__ import annotations
@@ -14,12 +15,13 @@ from picr_ma.envs.mpe import make_env
 from picr_ma.envs.slicing import TeammateSlicing, permute_teammates
 from picr_ma.networks import ActorCritic
 
-EVAL_SEED_OFFSET = 1_000_000
+EVAL_SEED_OFFSET = 1_000_000  # training episodes draw environment seeds below this
+SPLIT_OFFSETS = {"test": EVAL_SEED_OFFSET, "validation": 2 * EVAL_SEED_OFFSET}
 
 
-def eval_seeds(n: int) -> list[int]:
-    """Environment seeds reserved for evaluation; training seeds are drawn below the offset."""
-    return [EVAL_SEED_OFFSET + i for i in range(n)]
+def eval_seeds(n: int, split: str = "test") -> list[int]:
+    """``n`` environment seeds reserved for evaluation; disjoint from training and from the other split."""
+    return [SPLIT_OFFSETS[split] + i for i in range(n)]
 
 
 def play_episodes(
@@ -30,19 +32,21 @@ def play_episodes(
     sample_seed: int = 0,
     greedy: bool = False,
     collect_obs: bool = False,
-    teammate_permutation: tuple[int, ...] | None = None,
-    ablate_teammates: bool = False,
+    slot_permutations: list[tuple[int, ...]] | None = None,
+    resample_teammates: bool = False,
 ) -> dict[str, np.ndarray]:
     """Roll out one episode per seed (in parallel); team slot ``i`` is controlled by ``team[i]``.
 
-    ``adversary`` may be a list of policies, in which case episode ``i`` is played
-    against ``adversary[i % len(adversary)]``.
+    ``adversary`` may be a list of policies; episodes are assigned to them in
+    pairs, episode ``i`` facing ``adversary[(i // 2) % len(adversary)]``, so the
+    even and odd episodes see the same opponents (used for split-half checks).
 
-    ``teammate_permutation`` reorders the teammate blocks of every team
-    observation before the policies see it (an "order shift": the same state,
-    described with teammates listed in a different order). ``ablate_teammates``
-    zeroes every teammate block instead, a control that removes the teammate
-    information altogether.
+    ``slot_permutations`` gives one teammate-slot permutation per team slot:
+    agent ``i`` sees its teammates reordered by ``slot_permutations[i]`` (an
+    "order shift": the same state described in a different teammate order).
+    ``resample_teammates`` replaces every agent's teammate blocks with those of
+    the next episode in the batch at the same step: realistic teammate
+    features that carry no information about the agent's own episode.
 
     Returns per-episode team returns (sum over time of the mean team reward) and
     optionally the visited team observations, flattened to (episodes*T*N, D).
@@ -54,7 +58,8 @@ def play_episodes(
     adversaries = list(adversary) if isinstance(adversary, (list, tuple)) else [adversary]
     if spec.n_adversaries and any(a is None for a in adversaries):
         raise ValueError(f"{env_name} needs an adversary policy")
-    assignment = np.arange(len(seeds)) % len(adversaries)
+    assignment = (np.arange(len(seeds)) // 2) % len(adversaries)
+    blocks = list(np.ravel(spec.slicing.teammate_blocks))
     generator = torch.Generator().manual_seed(sample_seed)
     obs = env.reset(seeds)
     returns = np.zeros(len(seeds))
@@ -62,12 +67,17 @@ def play_episodes(
     done = False
     while not done:
         team_obs = obs["team"]
-        if teammate_permutation is not None:
-            flat = permute_teammates(team_obs.reshape(-1, spec.obs_dim), spec.slicing, np.asarray(teammate_permutation))
-            team_obs = flat.reshape(team_obs.shape)
-        if ablate_teammates:
+        if resample_teammates:
             team_obs = team_obs.copy()
-            team_obs[..., list(np.ravel(spec.slicing.teammate_blocks))] = 0.0
+            team_obs[:, :, blocks] = np.roll(obs["team"], 1, axis=0)[:, :, blocks]
+        if slot_permutations is not None:
+            team_obs = np.stack(
+                [
+                    permute_teammates(team_obs[:, slot], spec.slicing, np.asarray(perm))
+                    for slot, perm in enumerate(slot_permutations)
+                ],
+                axis=1,
+            )
         if collect_obs:
             visited.append(team_obs.reshape(-1, spec.obs_dim))
         actions = np.stack([policy.act(team_obs[:, slot], generator, greedy)[0] for slot, policy in enumerate(team)], axis=1)

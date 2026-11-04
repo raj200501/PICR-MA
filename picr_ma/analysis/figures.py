@@ -243,14 +243,14 @@ def additive_fit(xp_by_env: dict, out: Path) -> None:
 
 
 def order_shift(estimates_by_env: dict, out: Path) -> None:
-    """Return lost when teammates are reordered vs. when their features are removed, per method (95% CIs)."""
+    """Self-play return lost under a genuine teammate-order shift vs. with teammate features resampled (95% CIs)."""
     envs = [env for env in estimates_by_env if any("shift_drop" in e for e in estimates_by_env[env].values())]
     fig, axes = plt.subplots(1, len(envs), figsize=(3.3 * len(envs), 2.3), squeeze=False)
     for ax, env in zip(axes[0], envs):
         est = estimates_by_env[env]
         methods = [m for m in METHOD_ORDER if m in est and "shift_drop" in est[m]]
         for i, method in enumerate(methods):
-            for offset, key, filled in [(-0.14, "shift_drop", True), (0.14, "ablation_drop", False)]:
+            for offset, key, filled in [(-0.14, "shift_drop", True), (0.14, "resample_drop", False)]:
                 e = est[method][key]
                 ax.bar(
                     i + offset, e.mean, width=0.26, color=COLORS[method] if filled else "white", edgecolor=COLORS[method], lw=1.2
@@ -262,8 +262,8 @@ def order_shift(estimates_by_env: dict, out: Path) -> None:
         ax.set_title(ENV_LABELS.get(env, env))
         ax.grid(axis="x", visible=False)
     handles = [
-        plt.Rectangle((0, 0), 1, 1, facecolor=MUTED, edgecolor=MUTED, label="teammates reordered"),
-        plt.Rectangle((0, 0), 1, 1, facecolor="white", edgecolor=MUTED, label="teammate features removed"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=MUTED, edgecolor=MUTED, label="teammate order changed (genuine shift)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor="white", edgecolor=MUTED, label="teammate features resampled"),
     ]
     fig.legend(handles=handles, frameon=False, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 1.0))
     _save(fig, out)

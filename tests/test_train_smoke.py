@@ -1,9 +1,11 @@
+import csv
 import gzip
 import json
 
 import numpy as np
 import pytest
 
+from picr_ma.envs.mpe import make_env
 from picr_ma.networks import load_policy
 from picr_ma.ppo import PPOConfig
 from picr_ma.train import METHODS, TrainConfig, train
@@ -66,3 +68,40 @@ def test_finished_run_with_a_different_config_is_not_reused(tmp_path):
     changed = TrainConfig(env="simple_spread_v3", method="ippo", seed=0, total_steps=200, num_envs=4, eval_episodes=4)
     with pytest.raises(RuntimeError, match="different config"):
         _ = Run("s", changed, tmp_path).done
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_each_method_trains_with_its_own_mechanism(tmp_path, monkeypatch, method):
+    """PICR's penalty is active only for PICR; order_aug permutes inputs at every step;
+    order_rand holds one permutation per agent for the whole episode; others see raw inputs."""
+    import picr_ma.train as train_module
+
+    calls = []
+    original = train_module._policy_input
+
+    def recording(method, obs, slicing, rng, episode_perms=None):
+        out = original(method, obs, slicing, rng, episode_perms)
+        calls.append((obs.copy(), out.copy()))
+        return out
+
+    monkeypatch.setattr(train_module, "_policy_input", recording)
+    config = TrainConfig(env="simple_spread_v3", method=method, seed=0, total_steps=200, num_envs=4, eval_episodes=4, log_every=1)
+    train(config, tmp_path)
+    with gzip.open(tmp_path / "metrics.csv.gz", "rt") as handle:
+        picr_losses = [float(row["picr_loss"]) for row in csv.DictReader(handle)]
+    assert (max(picr_losses) > 0) == (method == "picr")
+
+    slicing = make_env("simple_spread_v3").spec.slicing
+    teammate, own = list(np.ravel(slicing.teammate_blocks)), list(slicing.self_indices)
+    raw, seen = np.stack([c[0] for c in calls]), np.stack([c[1] for c in calls])  # (steps, rows, D)
+    np.testing.assert_array_equal(raw[..., own], seen[..., own])
+    if method in ("ippo", "picr", "deepsets"):
+        np.testing.assert_array_equal(raw, seen)
+        return
+    swapped = (seen[..., teammate] != raw[..., teammate]).any(axis=-1)  # (steps, rows): rows whose order changed
+    assert 0.2 < swapped.mean() < 0.8  # two teammates: half the permutations swap them
+    episode = slice(0, 25)  # the first episode's 25 steps
+    if method == "order_rand":
+        assert (swapped[episode] == swapped[0]).all()  # fixed within the episode
+    else:
+        assert not (swapped[episode] == swapped[0]).all()

@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """Self-play under shifted teammate order, for every run in a suite.
 
-    python scripts/order_shift.py --suite main --episodes 200 --workers 4
+    python scripts/order_shift.py --suite main --episodes 240 --workers 4
 
-Each run's team plays itself with every agent's teammate blocks reordered by
-each permutation (identity included), on the same evaluation episodes and
-adversary pool as cross-play. Writes results/<suite>/<env>/order_shift.csv.
+Each run's team plays itself under every combination of per-agent teammate
+orderings (relabeling patterns as a null control, genuinely different
+conventions as the test) and with teammate features resampled from other
+episodes, on the same evaluation episodes and adversary pool as cross-play.
+Writes results/<suite>/<env>/order_shift.csv.
 """
 
 from __future__ import annotations
@@ -35,16 +37,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
-    parser.add_argument("--episodes", type=int, default=200)
+    parser.add_argument("--episodes", type=int, default=240)
+    parser.add_argument(
+        "--split",
+        choices=["validation", "test"],
+        default=None,
+        help="evaluation episodes to use (default: validation for the lambda suite, test otherwise)",
+    )
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
+    split = args.split or ("validation" if args.suite == "lambda" else "test")
 
     for env_dir in sorted(p for p in (args.results_dir / args.suite).iterdir() if p.is_dir()):
         runs = find_runs(env_dir)
         if not runs:
             continue
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            chunks = list(pool.map(_evaluate, [(run, args.episodes, adversary_pool(runs)) for run in runs]))
+            chunks = list(pool.map(_evaluate, [(run, args.episodes, adversary_pool(runs), split) for run in runs]))
         rows = [row for chunk in chunks for row in chunk]
         with (env_dir / "order_shift.csv").open("w", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(rows[0]))

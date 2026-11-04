@@ -15,12 +15,20 @@ from picr_ma.regularizers import picr_loss
 
 @dataclass
 class PPOConfig:
-    lr: float = 5e-4
+    """PPO hyperparameters; the defaults are the tuned values used for every method (docs/tuning.md).
+
+    ``picr_lambda`` is the weight of the PICR penalty inside ``ppo_update``.
+    ``train()`` sets it from ``TrainConfig.picr_lambda`` for the ``picr`` method
+    and to 0 otherwise, so in a run's stored config.json the effective weight is
+    the top-level ``picr_lambda`` (also recorded in summary.json).
+    """
+
+    lr: float = 1e-3
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip: float = 0.2
-    epochs: int = 5
-    minibatches: int = 2
+    epochs: int = 10
+    minibatches: int = 8
     vf_coef: float = 0.5
     ent_coef: float = 0.01
     max_grad_norm: float = 0.5

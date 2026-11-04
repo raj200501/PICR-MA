@@ -84,3 +84,55 @@ def split_self_teammates(obs: torch.Tensor, slicing: TeammateSlicing) -> tuple[t
     self_idx = torch.as_tensor(slicing.self_indices, device=obs.device)
     team_idx = torch.as_tensor(slicing.teammate_blocks, device=obs.device)
     return obs[:, self_idx], obs[:, team_idx]
+
+
+def teammate_views(n_agents: int, slot_perms) -> list[tuple[int, ...]]:
+    """Which teammate each agent sees in each slot, given one slot permutation per agent.
+
+    Agent ``i`` normally lists its teammates in index order; its permutation
+    ``slot_perms[i]`` places canonical teammate ``p[k]`` in slot ``k``.
+    """
+    views = []
+    for agent, perm in enumerate(slot_perms):
+        canonical = [j for j in range(n_agents) if j != agent]
+        views.append(tuple(canonical[k] for k in perm))
+    return views
+
+
+def relabeling_for(views: list[tuple[int, ...]]) -> tuple[int, ...] | None:
+    """A relabeling of the agents that produces exactly these views, or None if there is none.
+
+    Every agent lists its teammates in label order, so a pattern of views is
+    induced by a relabeling exactly when one total order of the agents is
+    consistent with every agent's list; agent ``i``'s new label is its rank in
+    that order. With exchangeable agents and a shared policy, such a pattern
+    cannot change expected returns: it is the same game with the agents renamed.
+    """
+    n = len(views)
+    for order in itertools.permutations(range(n)):
+        rank = {agent: r for r, agent in enumerate(order)}
+        if all(all(rank[a] < rank[b] for a, b in zip(view, view[1:])) for view in views):
+            return tuple(rank[agent] for agent in range(n))
+    return None
+
+
+def induced_by_relabeling(views: list[tuple[int, ...]]) -> bool:
+    return relabeling_for(views) is not None
+
+
+def view_patterns(n_agents: int, slicing: TeammateSlicing) -> list[dict]:
+    """Every combination of per-agent teammate-slot permutations, labelled by kind.
+
+    ``identity``: all agents see the canonical order. ``relabeling``: a
+    non-identity pattern that a renaming of the agents also produces (a null
+    control). ``genuine``: a pattern no renaming produces; for three agents these
+    are the two cyclic conventions in which agent ``i`` lists ``i+1, i+2`` (or
+    the reverse) modulo 3.
+    """
+    patterns = []
+    for slot_perms in itertools.product(slicing.all_permutations(), repeat=n_agents):
+        identity = all(p == tuple(range(slicing.n_teammates)) for p in slot_perms)
+        relabel = induced_by_relabeling(teammate_views(n_agents, slot_perms))
+        kind = "identity" if identity else ("relabeling" if relabel else "genuine")
+        patterns.append({"slot_perms": slot_perms, "kind": kind})
+    return patterns

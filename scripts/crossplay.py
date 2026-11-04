@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Evaluate all ordered pairs of runs in a suite, per environment.
 
-    python scripts/crossplay.py --suite main --episodes 200 --workers 4
+    python scripts/crossplay.py --suite main --episodes 240 --workers 4
 
 Writes results/<suite>/<env>/crossplay.csv with one row per (ego, partner).
 """
@@ -33,9 +33,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
-    parser.add_argument("--episodes", type=int, default=200)
+    parser.add_argument("--episodes", type=int, default=240)
+    parser.add_argument(
+        "--split",
+        choices=["validation", "test"],
+        default=None,
+        help="evaluation episodes to use (default: validation for the lambda suite, test otherwise)",
+    )
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
+    split = args.split or ("validation" if args.suite == "lambda" else "test")
 
     for env_dir in sorted(p for p in (args.results_dir / args.suite).iterdir() if p.is_dir()):
         runs = find_runs(env_dir)
@@ -44,7 +51,7 @@ def main() -> None:
         print(f"{env_dir.name}: {len(runs)} runs, {len(runs) ** 2} ordered pairs", flush=True)
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
             adversaries = adversary_pool(runs)
-            chunks = list(pool.map(_evaluate, [(ego, runs, args.episodes, adversaries) for ego in runs]))
+            chunks = list(pool.map(_evaluate, [(ego, runs, args.episodes, adversaries, split) for ego in runs]))
         rows = [row for chunk in chunks for row in chunk]
         out = env_dir / "crossplay.csv"
         with out.open("w", newline="") as handle:
