@@ -224,6 +224,7 @@ def main() -> None:
     lambda_dir = args.results_dir / "lambda"
     sweep = lambda_table(lambda_dir)
     figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
+    (tab_dir / "lambda_sweep.tex").write_text(tables.lambda_table(sweep))
     report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")
     report["compute"] = {"main": compute_record(summaries), "lambda": compute_record(load_summaries(lambda_dir))}
     long = None
@@ -243,6 +244,7 @@ def main() -> None:
         }
         report["compute"]["long"] = compute_record(long_summaries)
         report["long"]["late_training_slope"] = {env: late_training_slope(load_curves(long_dir, env)) for env in long_envs}
+    (tab_dir / "compute.tex").write_text(tables.compute_table(report["compute"]))
     report["provenance"] = provenance()
     report["input_provenance"] = input_provenance(args.results_dir)
 

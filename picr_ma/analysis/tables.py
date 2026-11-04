@@ -128,6 +128,52 @@ def long_table(estimates_by_env: dict, comparisons_by_env: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def lambda_table(sweep) -> str:
+    """Appendix: the lambda sweep on the selection seeds (validation episodes), with IPPO as lambda = 0."""
+    lines = [
+        r"\begin{tabular}{llcccc}",
+        r"\toprule",
+        r"Env. & $\lambda$ & Self-play $\uparrow$ & Cross-play $\uparrow$ & SP$-$XP gap & Perm.\ JS ($\times 10^{-3}$) \\",
+        r"\midrule",
+    ]
+    for k, (env, rows) in enumerate(sweep.groupby("env", sort=False)):
+        if k:
+            lines.append(r"\midrule")
+        for _, r in rows.sort_values("lam").iterrows():
+            lam = "0 (IPPO)" if r["method"] == "ippo" else f"{r['lam']:g}"
+            cells = [f"{_num(r[key])} \\scriptsize{{{_interval(r[f'{key}_lo'], r[f'{key}_hi'])}}}" for key in ("sp", "xp")]
+            cells.append(_num(r["gap"]))
+            cells.append(
+                f"{_num(1e3 * r['perm_js'], '{:.1f}')} \\scriptsize{{{_interval(1e3 * r['perm_js_lo'], 1e3 * r['perm_js_hi'], '{:.1f}')}}}"
+            )
+            lines.append(f"{ENV_LABELS.get(env, env)} & {lam} & " + " & ".join(cells) + r" \\")
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def compute_table(compute: dict) -> str:
+    """Appendix: training wall-clock per run (median and range, minutes) by suite, environment and method."""
+    lines = [
+        r"\begin{tabular}{lllcc}",
+        r"\toprule",
+        r"Suite & Env. & Method & Runs & Minutes per run \\",
+        r"\midrule",
+    ]
+    for suite in ("lambda", "main", "long"):
+        if suite not in compute:
+            continue
+        for env, by_variant in sorted(compute[suite]["per_run_minutes"].items()):
+            for variant, r in sorted(by_variant.items()):
+                minutes = f"${r['median']:.1f}$ \\scriptsize{{$[{r['min']:.1f}, {r['max']:.1f}]$}}"
+                method, _, lam = variant.partition("_lam")
+                name = METHOD_LABELS.get(method, method) + (rf" $\lambda{{=}}{lam}$" if lam else "")
+                lines.append(f"{suite} & {ENV_LABELS.get(env, env)} & {name} & ${int(r['count'])}$ & {minutes} \\\\")
+        lines.append(r"\midrule")
+    lines[-1] = r"\bottomrule"
+    lines.append(r"\end{tabular}")
+    return "\n".join(lines) + "\n"
+
+
 def markdown_table(estimates_by_env: dict) -> str:
     rows = [
         "| Env | Method | Self-play ↑ | Cross-play ↑ | SP−XP gap ↓ | Perm. JS (×10⁻³) | Order-shift drop |",
@@ -225,6 +271,11 @@ def _report_macros(define, report: dict) -> None:
         define(f"{ENV_MACRO[env]}SlopeHi", _num(max(means)))
         define(f"{ENV_MACRO[env]}SlopePos", str(sum(s["n_positive"] for s in by_method.values())))
         define(f"{ENV_MACRO[env]}SlopeN", str(sum(s["n"] for s in by_method.values())))
+    for suite, record in report.get("compute", {}).items():
+        define(f"Compute{suite.capitalize()}Hours", f"{record['total_hours']:.0f}")
+    for env, entry in report.get("overhead", {}).get("envs", {}).items():
+        for method, r in entry["methods"].items():
+            define(f"{ENV_MACRO[env]}{METHOD_MACRO[method]}ActorParams", f"{r['actor_params']:,}".replace(",", "{,}"))
     for env, lam in report.get("selected_lambda", {}).items():
         define(f"{ENV_MACRO[env]}Lambda", f"{lam:g}")
     ref = report.get("reference_returns", {})

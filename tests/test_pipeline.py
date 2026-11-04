@@ -92,6 +92,8 @@ def test_full_pipeline(tmp_path):
         "LongSpreadDeepSetsGap",
         "LongSpreadPICRdGapp",
         "SpreadSlopePos",
+        "ComputeMainHours",
+        "SpreadDeepSetsActorParams",
     ]:
         assert f"\\newcommand{{\\{macro}}}" in numbers, macro
     # Every generated macro the paper uses is defined.
@@ -103,7 +105,7 @@ def test_full_pipeline(tmp_path):
         for m in re.findall(r"\\((?:Spread|Adversary|Long|Ref|PC|EnvSpeedup)\w*)", tex.read_text())
     }
     assert used <= defined, sorted(used - defined)
-    for table in ["main_results", "comparison", "order_measures", "overhead", "long_budget"]:
+    for table in ["main_results", "comparison", "order_measures", "overhead", "long_budget", "lambda_sweep", "compute"]:
         assert (paper / "tables" / f"{table}.tex").exists()
     report = json.loads((results / "analysis.json").read_text())
     assert set(report["estimates"]["simple_spread_v3"]) == set(CONFIG["suites"]["main"]["methods"])
