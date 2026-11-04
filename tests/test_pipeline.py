@@ -1,6 +1,7 @@
 """End to end: every script in the pipeline, on a tiny two-suite configuration."""
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +64,8 @@ def test_full_pipeline(tmp_path):
     _run("crossplay.py", "--suite", "main", *common, "--episodes", 8, "--workers", 2)
     _run("order_shift.py", "--suite", "main", *common, "--episodes", 8, "--workers", 2)
     _run("reference_returns.py", *common, "--episodes", 16)
+    _run("positive_control.py", *common, "--episodes", 8)
+    _run("benchmark_env.py", *common, "--episodes", 20)
     _run("benchmark_overhead.py", *common, "--config", config, "--repeats", 1)
     _run("analyze.py", *common, "--paper-dir", paper, "--config", config, "--png-dir", tmp_path / "png", "--n-perm", 50)
 
@@ -77,13 +80,43 @@ def test_full_pipeline(tmp_path):
         "RefAssign",
     ]:
         assert f"\\newcommand{{\\{macro}}}" in numbers, macro
+    # Every generated macro the paper uses is defined.
+    defined = set(re.findall(r"\\newcommand\{\\(\w+)\}", numbers))
+    used = {
+        m
+        for tex in (ROOT / "paper").glob("**/*.tex")
+        if "tables" not in tex.parts
+        for m in re.findall(r"\\((?:Spread|Adversary|Ref|PC|EnvSpeedup)\w*)", tex.read_text())
+    }
+    assert used <= defined, sorted(used - defined)
     for table in ["main_results", "comparison", "order_measures", "overhead"]:
         assert (paper / "tables" / f"{table}.tex").exists()
     report = json.loads((results / "analysis.json").read_text())
     assert set(report["estimates"]["simple_spread_v3"]) == set(CONFIG["suites"]["main"]["methods"])
+    assert report["provenance"]["git_commit"] and set(report["compute"]) == {"main", "lambda"}
+    assert json.loads((results / "main" / "simple_spread_v3" / "crossplay.provenance.json").read_text())["split"] == "test"
     assert (tmp_path / "png" / "order_shift.png").exists()
 
-    # The analysis refuses PICR runs trained with a weight other than the selected one.
+    # An evaluation output missing from results/ is an error, not a silently skipped table.
+    (results / "overhead.json").rename(results / "overhead.moved")
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "analyze.py"),
+            *map(str, common),
+            "--paper-dir",
+            str(paper),
+            "--config",
+            str(config),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert proc.returncode != 0 and "overhead.json" in proc.stderr
+    (results / "overhead.moved").rename(results / "overhead.json")
+
+    # A selection that disagrees with the configured PICR weights is refused.
     selection["simple_spread_v3"]["selected_lambda"] = 123.0
     (results / "lambda" / "selection.json").write_text(json.dumps(selection))
     proc = subprocess.run(
@@ -102,4 +135,4 @@ def test_full_pipeline(tmp_path):
         text=True,
         cwd=ROOT,
     )
-    assert proc.returncode != 0 and "selects" in proc.stderr
+    assert proc.returncode != 0 and "disagrees" in proc.stderr

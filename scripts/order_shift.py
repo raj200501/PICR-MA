@@ -7,13 +7,14 @@ Each run's team plays itself under every combination of per-agent teammate
 orderings (relabeling patterns as a null control, genuinely different
 conventions as the test) and with teammate features resampled from other
 episodes, on the same evaluation episodes and adversary pool as cross-play.
-Writes results/<suite>/<env>/order_shift.csv.
+Writes results/<suite>/<env>/order_shift.csv and order_shift.provenance.json.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -33,6 +34,7 @@ def _evaluate(args):
 
 def main() -> None:
     from picr_ma.crossplay import adversary_pool, find_runs
+    from picr_ma.provenance import provenance
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
@@ -59,6 +61,8 @@ def main() -> None:
             writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
+        meta = {"suite": args.suite, "episodes": args.episodes, "split": split, "provenance": provenance()}
+        (env_dir / "order_shift.provenance.json").write_text(json.dumps(meta, indent=2))
         print(f"{env_dir.name}: {len(runs)} runs -> {env_dir / 'order_shift.csv'}", flush=True)
 
 

@@ -3,9 +3,12 @@
 
     python scripts/analyze.py
 
-Reads results/main (and results/lambda if present) and writes
-paper/figures/*.pdf, paper/tables/*.tex and results/analysis.json. Fails if the
-runs on disk differ from the runs configs/experiments.yaml defines.
+Reads the committed results/ (training runs, cross-play, order shift, the
+lambda suite, reference returns, instrument checks and benchmarks) and writes
+paper/figures/*.pdf, docs/figures/*.png, paper/tables/*.tex,
+results/analysis.json and results/main_results.md. It trains and evaluates
+nothing. Fails if an input is missing or if the runs on disk differ from the
+runs configs/experiments.yaml defines.
 """
 
 from __future__ import annotations
@@ -31,8 +34,55 @@ from picr_ma.analysis.aggregate import (
 )
 from picr_ma.analysis.stats import bootstrap_mean, bootstrap_pairs
 from picr_ma.experiments import expand_suite, load_suites
+from picr_ma.provenance import provenance
 
 ROOT = Path(__file__).resolve().parents[1]
+# Inputs produced by the evaluation stages, and the make target that produces each.
+REQUIRED = {
+    "main/{env}/crossplay.csv": "crossplay-main",
+    "main/{env}/order_shift.csv": "order-shift",
+    "lambda/{env}/crossplay.csv": "lambda",
+    "lambda/selection.json": "select",
+    "reference_returns.json": "reference",
+    "positive_control.json": "positive-control",
+    "env_speed.json": "env-speed",
+    "overhead.json": "overhead",
+}
+
+
+def check_inputs(results_dir: Path, envs: list[str]) -> None:
+    missing = sorted(
+        f"{path}  (make {target})"
+        for pattern, target in REQUIRED.items()
+        for path in {pattern.format(env=env) for env in envs}
+        if not (results_dir / path).exists()
+    )
+    if missing:
+        raise SystemExit("Missing inputs in " + str(results_dir) + ":\n  " + "\n  ".join(missing))
+
+
+def input_provenance(results_dir: Path) -> dict[str, str | None]:
+    """The git commit recorded by each evaluation output."""
+    out = {}
+    for path in sorted(results_dir.glob("**/*.json")):
+        if path.name in ("analysis.json", "summary.json", "config.json"):
+            continue
+        record = json.loads(path.read_text())
+        if isinstance(record, dict) and "provenance" in record:
+            out[str(path.relative_to(results_dir))] = record["provenance"]["git_commit"]
+    return out
+
+
+def compute_record(summaries: pd.DataFrame) -> dict:
+    """Training wall-clock per run (single-threaded processes, several in parallel), by environment and method."""
+    minutes = summaries.assign(minutes=summaries.train_seconds / 60)
+    by_group = minutes.groupby(["env", "variant"]).minutes.agg(["median", "min", "max", "count"]).round(1)
+    return {
+        "per_run_minutes": {
+            env: {variant: row.to_dict() for (e, variant), row in by_group.iterrows() if e == env} for env in set(summaries.env)
+        },
+        "total_hours": round(float(minutes.minutes.sum() / 60), 1),
+    }
 
 
 def check_complete(suite: str, results_dir: Path, config_path: Path) -> None:
@@ -114,8 +164,10 @@ def main() -> None:
 
     main_dir = args.results_dir / "main"
     check_complete("main", args.results_dir, args.config)
+    check_complete("lambda", args.results_dir, args.config)
     summaries = load_summaries(main_dir)
     envs = [e for e in ("simple_spread_v3", "simple_adversary_v3") if e in set(summaries.env)]
+    check_inputs(args.results_dir, envs)
     estimates, comparisons, curves, per_run, matrices, crossplays = {}, {}, {}, {}, {}, {}
     for env in envs:
         xp = load_crossplay(main_dir, env)
@@ -145,21 +197,17 @@ def main() -> None:
         "within_method_spearman_perm_js_vs_compatibility": {env: within_method_spearman(per_run[env]) for env in envs},
         "additive_decomposition": {env: additive_decomposition(crossplays[env]) for env in envs},
     }
-    selection = args.results_dir / "lambda" / "selection.json"
-    if selection.exists():
-        report["selected_lambda"] = check_selected_lambda(summaries, selection)
+    report["selected_lambda"] = check_selected_lambda(summaries, args.results_dir / "lambda" / "selection.json")
     for name in ("reference_returns", "overhead", "positive_control", "env_speed"):
-        path = args.results_dir / f"{name}.json"
-        if path.exists():
-            report[name] = json.loads(path.read_text())
-    if "overhead" in report:
-        (tab_dir / "overhead.tex").write_text(tables.overhead_table(report["overhead"]))
+        report[name] = json.loads((args.results_dir / f"{name}.json").read_text())
+    (tab_dir / "overhead.tex").write_text(tables.overhead_table(report["overhead"]))
     lambda_dir = args.results_dir / "lambda"
-    if lambda_dir.exists() and any(lambda_dir.glob("*/crossplay.csv")):
-        check_complete("lambda", args.results_dir, args.config)
-        sweep = lambda_table(lambda_dir)
-        figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
-        report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")
+    sweep = lambda_table(lambda_dir)
+    figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
+    report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")
+    report["compute"] = {"main": compute_record(summaries), "lambda": compute_record(load_summaries(lambda_dir))}
+    report["provenance"] = provenance()
+    report["input_provenance"] = input_provenance(args.results_dir)
 
     (tab_dir / "numbers.tex").write_text(tables.numbers_tex(estimates, comparisons, report))
     (args.results_dir / "analysis.json").write_text(json.dumps(report, indent=2))

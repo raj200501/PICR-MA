@@ -29,6 +29,7 @@ from picr_ma.envs.mpe import env_spec
 from picr_ma.experiments import expand_suite, load_suites
 from picr_ma.networks import ActorCritic
 from picr_ma.ppo import PPOConfig, ppo_update
+from picr_ma.provenance import provenance
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,9 +52,9 @@ def main() -> None:
     args = parser.parse_args()
     torch.set_num_threads(1)
     suite = load_suites(args.config)
-    picr_runs = {run.config.env: run.config for run in expand_suite(suite, "main", methods=["picr"])}
+    picr_runs = {run.config.env: run.config for run in expand_suite(suite, "main", args.results_dir, methods=["picr"])}
     config = next(iter(picr_runs.values()))
-    out = {"ppo": asdict(config.ppo), "num_envs": config.num_envs, "envs": {}}
+    out = {"ppo": asdict(config.ppo), "num_envs": config.num_envs, "torch_threads": torch.get_num_threads(), "envs": {}}
     for env in ("simple_spread_v3", "simple_adversary_v3"):
         picr_lambda = picr_runs[env].picr_lambda
         spec = env_spec(env)
@@ -97,6 +98,7 @@ def main() -> None:
                 f"  {method:>9}: update {r['update_seconds']:.3f}s ({r['update_vs_ippo']:.2f}x)  "
                 f"forward {r['forward_ms']:.3f}ms ({r['forward_vs_ippo']:.2f}x)  actor params {r['actor_params']}"
             )
+    out["provenance"] = provenance()
     args.results_dir.mkdir(parents=True, exist_ok=True)
     (args.results_dir / "overhead.json").write_text(json.dumps(out, indent=2))
 

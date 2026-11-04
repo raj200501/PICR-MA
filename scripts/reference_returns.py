@@ -28,6 +28,7 @@ import numpy as np
 
 from picr_ma.envs.mpe import make_env
 from picr_ma.evaluation import eval_seeds
+from picr_ma.provenance import provenance
 from picr_ma.scripted import steer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +69,7 @@ def main() -> None:
         print(f"{controller:>10}: {returns.mean():7.2f} +- {returns.std() / np.sqrt(episodes):.2f}")
     path = args.results_dir / "reference_returns.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"env": "simple_spread_v3", "episodes": episodes, **out}, indent=2))
+    path.write_text(json.dumps({"env": "simple_spread_v3", "episodes": episodes, **out, "provenance": provenance()}, indent=2))
 
 
 if __name__ == "__main__":

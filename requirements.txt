@@ -1,4 +1,5 @@
-# Exact versions used to produce the results in results/ and the paper.
+# Direct dependencies, pinned to the versions used to produce results/ and the paper.
+# requirements.lock pins every transitive dependency too; `make install` uses it.
 # CPU-only PyTorch:  pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 numpy==2.5.4
 torch==2.14.1

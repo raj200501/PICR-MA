@@ -62,6 +62,12 @@ def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results", me
     merged = {**defaults, **suite_spec}
     base = {k: merged[k] for k in TRAIN_KEYS if k in merged}
     ppo = PPOConfig(**{**defaults.get("ppo", {}), **suite_spec.get("ppo", {})})
+    selection_path = Path(results_dir) / "lambda" / "selection.json"
+    if "picr_lambda_by_env" in suite_spec and selection_path.exists():
+        selected = {env: v["selected_lambda"] for env, v in json.loads(selection_path.read_text()).items()}
+        configured = {env: lam for env, lam in suite_spec["picr_lambda_by_env"].items() if lam is not None}
+        if any(selected.get(env) != lam for env, lam in configured.items()):
+            raise ValueError(f"picr_lambda_by_env {configured} disagrees with {selection_path} ({selected})")
     runs = []
     for env, method, lam, seed in itertools.product(
         suite_spec["envs"],

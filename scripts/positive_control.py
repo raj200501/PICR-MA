@@ -34,6 +34,7 @@ import pandas as pd
 from picr_ma.analysis.additive import additive_decomposition
 from picr_ma.crossplay import order_shift_returns, returns_by_slot
 from picr_ma.evaluation import eval_seeds
+from picr_ma.provenance import provenance
 from picr_ma.scripted import FirstTeammateLandmark, GreedyAssignment
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,7 +104,7 @@ def main() -> None:
             f"resampled {out[name]['change_resampled']:+.2f}"
         )
     args.results_dir.mkdir(parents=True, exist_ok=True)
-    (args.results_dir / "positive_control.json").write_text(json.dumps(out, indent=2))
+    (args.results_dir / "positive_control.json").write_text(json.dumps({**out, "provenance": provenance()}, indent=2))
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from picr_ma.envs.mpe import make_env
+from picr_ma.provenance import provenance
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,6 +66,7 @@ def main() -> None:
         "batched_steps_per_s": batched,
         "mpe2_steps_per_s": reference,
         "speedup": batched / reference,
+        "provenance": provenance(),
     }
     print(f"batched {batched:,.0f} steps/s   mpe2 {reference:,.0f} steps/s   speedup {out['speedup']:.0f}x")
     args.results_dir.mkdir(parents=True, exist_ok=True)

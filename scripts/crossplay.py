@@ -3,13 +3,15 @@
 
     python scripts/crossplay.py --suite main --episodes 240 --workers 4
 
-Writes results/<suite>/<env>/crossplay.csv with one row per (ego, partner).
+Writes results/<suite>/<env>/crossplay.csv with one row per (ego, partner), and
+crossplay.provenance.json recording the code version that produced it.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -29,6 +31,7 @@ def _evaluate(args):
 
 def main() -> None:
     from picr_ma.crossplay import adversary_pool, find_runs
+    from picr_ma.provenance import provenance
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--suite", required=True)
@@ -58,6 +61,8 @@ def main() -> None:
             writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
+        meta = {"suite": args.suite, "episodes": args.episodes, "split": split, "provenance": provenance()}
+        (env_dir / "crossplay.provenance.json").write_text(json.dumps(meta, indent=2))
         print(f"  wrote {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}", flush=True)
 
 

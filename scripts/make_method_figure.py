@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -49,13 +50,14 @@ def bars(ax, x, y, probs, color):
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     fig, ax = plt.subplots(figsize=(6.6, 1.95))
     ax.set_xlim(0, 10.2)
     ax.set_ylim(-0.05, 3.0)
     ax.axis("off")
 
     end = obs_vector(ax, 0.85, 1.3, (0, 1), "$o$")
-    ax.text(0.85, 1.05, "agent observation", fontsize=7.5, color=MUTED)
+    ax.text((0.85 + end) / 2, 1.05, "observation", fontsize=7.5, color=MUTED, ha="center")
 
     rows = [
         (2.15, (1, 0), r"$\sigma_1 o$", [0.08, 0.62, 0.12, 0.10, 0.08]),
@@ -75,7 +77,9 @@ def main() -> None:
     arrow(ax, (7.95, 2.3), (8.35, 1.62), PICR)
     arrow(ax, (7.95, 0.55), (8.35, 1.3), PICR)
     box(ax, 8.4, 1.12, 1.75, 0.68, "symmetric KL\n" + r"$\mathcal{L}_\mathrm{PICR}$ (train only)", color=PICR, fill="#fdf0ea")
-    fig.savefig(ROOT / "paper" / "figures" / "method_overview.pdf", bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(
+        ROOT / "paper" / "figures" / "method_overview.pdf", bbox_inches="tight", pad_inches=0.02, metadata={"CreationDate": None}
+    )
     fig.savefig(ROOT / "docs" / "method_overview.png", dpi=200, bbox_inches="tight", pad_inches=0.05, facecolor="white")
 
 

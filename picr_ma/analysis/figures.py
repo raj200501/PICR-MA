@@ -51,7 +51,7 @@ PNG_DIR: Path | None = None  # when set, every figure is also written here as a 
 
 
 def _save(fig, out: Path) -> None:
-    fig.savefig(out)
+    fig.savefig(out, metadata={"CreationDate": None})  # no timestamp, so regenerating an unchanged figure is a no-op
     if PNG_DIR is not None:
         PNG_DIR.mkdir(parents=True, exist_ok=True)
         fig.savefig(PNG_DIR / (Path(out).stem + ".png"), dpi=200, facecolor="white")
@@ -77,12 +77,20 @@ def learning_curves(curves_by_env: dict[str, pd.DataFrame], out: Path) -> None:
         for row, (column, label) in enumerate([("episode_return", "Training return"), ("perm_js", "Permutation JS")]):
             ax = axes[row, col]
             stats = _binned(curves_by_env[env], column)
-            for method in METHOD_ORDER:
+            for k, method in enumerate(METHOD_ORDER):
                 s = stats[stats.variant == method]
                 if s.empty or (column == "perm_js" and method == "deepsets"):
                     continue
                 ax.plot(
-                    s.steps / 1e3, s["mean"], color=COLORS[method], ls=LINESTYLES[method], lw=1.5, label=METHOD_LABELS[method]
+                    s.steps / 1e3,
+                    s["mean"],
+                    color=COLORS[method],
+                    ls=LINESTYLES[method],
+                    lw=1.5,
+                    marker=MARKERS[method],
+                    ms=3,
+                    markevery=(k, 6),  # sparse, staggered markers so lines stay distinguishable without color
+                    label=METHOD_LABELS[method],
                 )
                 ax.fill_between(s.steps / 1e3, s["mean"] - s.se, s["mean"] + s.se, color=COLORS[method], alpha=0.18, lw=0)
             if column == "perm_js":
