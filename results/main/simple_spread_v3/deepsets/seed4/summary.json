@@ -1,0 +1,14 @@
+{
+  "env": "simple_spread_v3",
+  "method": "deepsets",
+  "seed": 4,
+  "picr_lambda": 0.0,
+  "env_steps": 5001600,
+  "train_seconds": 695.15,
+  "update_seconds": 636.02,
+  "n_params": 18950,
+  "self_play_return": -14.237982359877318,
+  "self_play_return_std": 4.3112567260038155,
+  "perm_js": 0.0,
+  "perm_flip_rate": 0.0
+}

@@ -1,0 +1,14 @@
+{
+  "env": "simple_spread_v3",
+  "method": "ippo",
+  "seed": 1,
+  "picr_lambda": 0.0,
+  "env_steps": 5001600,
+  "train_seconds": 475.6,
+  "update_seconds": 428.61,
+  "n_params": 11142,
+  "self_play_return": -13.688041723406473,
+  "self_play_return_std": 4.7202742850387525,
+  "perm_js": 0.13332509994506836,
+  "perm_flip_rate": 0.33024
+}

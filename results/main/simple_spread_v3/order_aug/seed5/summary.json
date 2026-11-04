@@ -1,0 +1,14 @@
+{
+  "env": "simple_spread_v3",
+  "method": "order_aug",
+  "seed": 5,
+  "picr_lambda": 0.0,
+  "env_steps": 5001600,
+  "train_seconds": 430.19,
+  "update_seconds": 382.86,
+  "n_params": 11142,
+  "self_play_return": -13.014189010615194,
+  "self_play_return_std": 4.749581742425569,
+  "perm_js": 0.1855906993150711,
+  "perm_flip_rate": 0.4493066666666667
+}
