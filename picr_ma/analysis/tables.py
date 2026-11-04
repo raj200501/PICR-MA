@@ -219,6 +219,12 @@ def _report_macros(define, report: dict) -> None:
         define(f"{e_name}TotalSD", _num(dec["sd_total"]))
         if "residual_split_half_corr" in dec:
             define(f"{e_name}ResidRel", _num(dec["residual_split_half_corr"]))
+    for env, by_method in report.get("late_training_slope", {}).items():
+        means = [s["mean"] for s in by_method.values()]
+        define(f"{ENV_MACRO[env]}SlopeLo", _num(min(means)))
+        define(f"{ENV_MACRO[env]}SlopeHi", _num(max(means)))
+        define(f"{ENV_MACRO[env]}SlopePos", str(sum(s["n_positive"] for s in by_method.values())))
+        define(f"{ENV_MACRO[env]}SlopeN", str(sum(s["n"] for s in by_method.values())))
     for env, lam in report.get("selected_lambda", {}).items():
         define(f"{ENV_MACRO[env]}Lambda", f"{lam:g}")
     ref = report.get("reference_returns", {})

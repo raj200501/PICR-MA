@@ -120,6 +120,24 @@ def within_method_spearman(per_run: pd.DataFrame) -> dict[str, float]:
     return out
 
 
+def late_training_slope(curves: pd.DataFrame, window: float = 1e6) -> dict[str, dict]:
+    """Per method, the least-squares slope of training return over each run's last ``window`` steps (points per 1M steps)."""
+    out = {}
+    for variant, runs in curves.groupby("variant"):
+        slopes = []
+        for _, run in runs.groupby("seed"):
+            last = run[run.env_steps > run.env_steps.max() - window]
+            slopes.append(np.polyfit(last.env_steps / 1e6, last.episode_return, 1)[0])
+        slopes = np.array(slopes)
+        out[variant] = {
+            "mean": float(slopes.mean()),
+            "sd": float(slopes.std(ddof=1)) if len(slopes) > 1 else 0.0,
+            "n_positive": int((slopes > 0).sum()),
+            "n": len(slopes),
+        }
+    return out
+
+
 def lambda_table(suite_dir: Path) -> pd.DataFrame:
     summaries = load_summaries(suite_dir)
     rows = []
@@ -197,6 +215,7 @@ def main() -> None:
         "method_crossplay_matrix_ego_by_partner": {env: matrices[env].round(3).to_dict(orient="index") for env in envs},
         "within_method_spearman_perm_js_vs_compatibility": {env: within_method_spearman(per_run[env]) for env in envs},
         "additive_decomposition": {env: additive_decomposition(crossplays[env]) for env in envs},
+        "late_training_slope": {env: late_training_slope(curves[env]) for env in envs},
     }
     report["selected_lambda"] = check_selected_lambda(summaries, args.results_dir / "lambda" / "selection.json")
     for name in ("reference_returns", "overhead", "positive_control", "env_speed"):
@@ -223,6 +242,7 @@ def main() -> None:
             "vs_ippo": long[1],
         }
         report["compute"]["long"] = compute_record(long_summaries)
+        report["long"]["late_training_slope"] = {env: late_training_slope(load_curves(long_dir, env)) for env in long_envs}
     report["provenance"] = provenance()
     report["input_provenance"] = input_provenance(args.results_dir)
 

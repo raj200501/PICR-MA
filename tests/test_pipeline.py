@@ -91,6 +91,7 @@ def test_full_pipeline(tmp_path):
         "RefAssign",
         "LongSpreadDeepSetsGap",
         "LongSpreadPICRdGapp",
+        "SpreadSlopePos",
     ]:
         assert f"\\newcommand{{\\{macro}}}" in numbers, macro
     # Every generated macro the paper uses is defined.
