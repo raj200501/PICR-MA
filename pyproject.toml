@@ -30,6 +30,7 @@ include = ["picr_ma*"]
 addopts = "-q"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
+markers = ["slow: end-to-end pipeline test (about a minute)"]
 
 [tool.ruff]
 line-length = 130

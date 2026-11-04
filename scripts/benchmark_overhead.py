@@ -6,10 +6,11 @@
 Wall-clock times of runs trained in parallel are affected by machine load, so
 the cost of each method is measured here in a single process on one thread:
 one PPO update (default config from configs/experiments.yaml) on an identical
-synthetic batch, and one batched forward pass at inference time. Reports
-medians over repeats and writes results/overhead.json. Order augmentation
-permutes inputs while acting, not during the update, so its update cost equals
-IPPO's by construction.
+synthetic batch, and one batched forward pass at inference time. PICR uses
+each environment's selected weight (a run that does not compute the penalty is
+an error). Reports medians over repeats and writes results/overhead.json.
+Order augmentation and randomization permute inputs while acting, not during
+the update, so their update cost equals IPPO's by construction.
 """
 
 from __future__ import annotations
@@ -49,9 +50,12 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=5)
     args = parser.parse_args()
     torch.set_num_threads(1)
-    config = expand_suite(load_suites(args.config), "main", methods=["ippo"])[0].config
-    out = {"ppo": asdict(config.ppo), "num_envs": config.num_envs, "picr_lambda": config.picr_lambda, "envs": {}}
+    suite = load_suites(args.config)
+    picr_runs = {run.config.env: run.config for run in expand_suite(suite, "main", methods=["picr"])}
+    config = next(iter(picr_runs.values()))
+    out = {"ppo": asdict(config.ppo), "num_envs": config.num_envs, "envs": {}}
     for env in ("simple_spread_v3", "simple_adversary_v3"):
+        picr_lambda = picr_runs[env].picr_lambda
         spec = env_spec(env)
         n = config.num_envs * spec.horizon * spec.n_team
         rng = np.random.default_rng(0)
@@ -63,13 +67,16 @@ def main() -> None:
             "returns": rng.normal(size=n).astype(np.float32),
         }
         results = {}
-        for method in ("ippo", "picr", "deepsets", "order_aug"):
+        for method in ("ippo", "picr", "deepsets", "order_aug", "order_rand"):
             torch.manual_seed(0)
             model = ActorCritic(
                 spec.obs_dim, spec.n_actions, encoder="deepsets" if method == "deepsets" else "mlp", slicing=spec.slicing
             )
             optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.lr)
-            ppo = PPOConfig(**{**asdict(config.ppo), "picr_lambda": config.picr_lambda if method == "picr" else 0.0})
+            ppo = PPOConfig(**{**asdict(config.ppo), "picr_lambda": picr_lambda if method == "picr" else 0.0})
+            stats = ppo_update(model, optimizer, batch, ppo, rng, spec.slicing)
+            if (stats["picr_loss"] > 0) != (method == "picr"):
+                raise RuntimeError(f"PICR penalty {'missing' if method == 'picr' else 'active'} in the {method} benchmark")
             update = _median_seconds(partial(ppo_update, model, optimizer, batch, ppo, rng, spec.slicing), repeats=args.repeats)
             obs = batch["obs"][: config.num_envs * spec.n_team]
             forward = _median_seconds(partial(model.action_probs, obs), repeats=200)
@@ -83,7 +90,7 @@ def main() -> None:
         for method in results:
             results[method]["update_vs_ippo"] = results[method]["update_seconds"] / results["ippo"]["update_seconds"]
             results[method]["forward_vs_ippo"] = results[method]["forward_ms"] / results["ippo"]["forward_ms"]
-        out["envs"][env] = results
+        out["envs"][env] = {"picr_lambda": picr_lambda, "methods": results}
         print(env)
         for method, r in results.items():
             print(

@@ -18,9 +18,8 @@ import numpy as np
 import pandas as pd
 
 from picr_ma.analysis import figures, tables
-from picr_ma.analysis.additive import additive_decomposition
+from picr_ma.analysis.additive import additive_decomposition, run_compatibility
 from picr_ma.analysis.aggregate import (
-    METHOD_ORDER,
     compare_to,
     crossplay_block,
     load_crossplay,
@@ -49,24 +48,29 @@ def check_complete(suite: str, results_dir: Path, config_path: Path) -> None:
         )
 
 
-def within_method_spearman(per_run: pd.DataFrame) -> dict[str, float]:
-    """Spearman correlation between a run's permutation sensitivity and its cross-play, within each method."""
-    out = {}
-    for method, runs in per_run.groupby("method"):
-        if runs.perm_js.std() > 0:
-            out[method] = float(runs[["perm_js", "xp"]].corr("spearman").iloc[0, 1])
-    return out
+def check_selected_lambda(summaries: pd.DataFrame, selection_path: Path) -> dict[str, float]:
+    """The PICR runs must have been trained with the weight the selection rule picked."""
+    selected = {env: v["selected_lambda"] for env, v in json.loads(selection_path.read_text()).items()}
+    picr = summaries[summaries.variant == "picr"]
+    used = {env: sorted(set(picr[picr.env == env].picr_lambda)) for env in set(picr.env)}
+    if any(used[env] != [selected[env]] for env in used):
+        raise SystemExit(f"Main-suite PICR runs were trained with {used}, but {selection_path} selects {selected}")
+    return selected
 
 
 def per_run_table(summaries: pd.DataFrame, xp: pd.DataFrame, env: str) -> pd.DataFrame:
-    rows = []
-    for method in METHOD_ORDER:
-        block = crossplay_block(xp, method, method)
-        runs = summaries[(summaries.env == env) & (summaries.variant == method)].sort_values("seed")
-        for i, (_, run) in enumerate(runs.iterrows()):
-            others = np.delete(block[i], i)
-            rows.append({"method": method, "seed": run.seed, "sp": block[i, i], "xp": others.mean(), "perm_js": run.perm_js})
-    return pd.DataFrame(rows)
+    """Per run: permutation sensitivity and competence-adjusted compatibility with its partners."""
+    runs = summaries[summaries.env == env][["variant", "seed", "perm_js"]].rename(columns={"variant": "method"})
+    return runs.merge(run_compatibility(xp), on=["method", "seed"])
+
+
+def within_method_spearman(per_run: pd.DataFrame) -> dict[str, float]:
+    """Spearman correlation between a run's permutation sensitivity and its compatibility, within each method."""
+    out = {}
+    for method, runs in per_run.groupby("method"):
+        if runs.perm_js.std() > 0:
+            out[method] = float(runs[["perm_js", "compatibility"]].corr("spearman").iloc[0, 1])
+    return out
 
 
 def lambda_table(suite_dir: Path) -> pd.DataFrame:
@@ -84,6 +88,7 @@ def lambda_table(suite_dir: Path) -> pd.DataFrame:
                     "env": env,
                     "lam": lam,
                     "n_seeds": len(runs),
+                    "gap": sp.mean - cross.mean,
                     **{f"sp{s}": v for s, v in zip(("", "_lo", "_hi"), (sp.mean, sp.lo, sp.hi))},
                     **{f"xp{s}": v for s, v in zip(("", "_lo", "_hi"), (cross.mean, cross.lo, cross.hi))},
                     **{f"perm_js{s}": v for s, v in zip(("", "_lo", "_hi"), (js.mean, js.lo, js.hi))},
@@ -100,6 +105,7 @@ def main() -> None:
     parser.add_argument(
         "--png-dir", type=Path, default=ROOT / "docs" / "figures", help="PNG copies of the figures, for the README"
     )
+    parser.add_argument("--n-perm", type=int, default=10_000, help="permutations per permutation test")
     args = parser.parse_args()
     figures.PNG_DIR = args.png_dir
     fig_dir, tab_dir = args.paper_dir / "figures", args.paper_dir / "tables"
@@ -116,7 +122,7 @@ def main() -> None:
         crossplays[env] = xp
         shift = load_order_shift(main_dir, env)
         estimates[env] = method_estimates(summaries, xp, env, shift=shift)
-        comparisons[env] = compare_to(estimates[env], summaries, xp, env, shift=shift)
+        comparisons[env] = compare_to(estimates[env], summaries, xp, env, n_perm=args.n_perm, shift=shift)
         curves[env] = load_curves(main_dir, env)
         per_run[env] = per_run_table(summaries, xp, env)
         matrices[env] = method_matrix(xp)
@@ -129,19 +135,20 @@ def main() -> None:
         figures.order_shift(estimates, fig_dir / "order_shift.pdf")
     (tab_dir / "main_results.tex").write_text(tables.main_table(estimates))
     (tab_dir / "comparison.tex").write_text(tables.comparison_table(comparisons))
+    (tab_dir / "order_measures.tex").write_text(tables.order_table(estimates))
 
     report = {
         "seeds_per_method": {env: summaries[summaries.env == env].groupby("variant").seed.nunique().to_dict() for env in envs},
         "estimates": {env: {m: {k: v.as_dict() for k, v in est.items()} for m, est in estimates[env].items()} for env in envs},
         "vs_ippo": comparisons,
         "method_crossplay_matrix_ego_by_partner": {env: matrices[env].round(3).to_dict(orient="index") for env in envs},
-        "within_method_spearman_perm_js_vs_xp": {env: within_method_spearman(per_run[env]) for env in envs},
+        "within_method_spearman_perm_js_vs_compatibility": {env: within_method_spearman(per_run[env]) for env in envs},
         "additive_decomposition": {env: additive_decomposition(crossplays[env]) for env in envs},
     }
     selection = args.results_dir / "lambda" / "selection.json"
     if selection.exists():
-        report["selected_lambda"] = {env: v["selected_lambda"] for env, v in json.loads(selection.read_text()).items()}
-    for name in ("reference_returns", "overhead"):
+        report["selected_lambda"] = check_selected_lambda(summaries, selection)
+    for name in ("reference_returns", "overhead", "positive_control", "env_speed"):
         path = args.results_dir / f"{name}.json"
         if path.exists():
             report[name] = json.loads(path.read_text())

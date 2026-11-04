@@ -90,12 +90,22 @@ def resample_runs(n: int, rng: np.random.Generator, need_distinct: bool = False)
             return idx
 
 
-def group_statistics(matrix: np.ndarray, idx: np.ndarray, per_run: dict[str, np.ndarray]) -> dict[str, float]:
-    """Self-play, cross-play, gap and per-run means for the runs ``idx`` of a pooled pairing matrix."""
+def group_statistics(
+    matrix: np.ndarray, idx: np.ndarray, per_run: dict[str, np.ndarray], pair_stats: dict[str, np.ndarray] | None = None
+) -> dict[str, float]:
+    """Self-play, cross-play, gap, per-run means and pair-statistic means for the runs ``idx``.
+
+    ``matrix`` is a pooled pairing matrix of returns; each entry of ``pair_stats``
+    is another pooled matrix whose mean over distinct pairs within ``idx`` is reported.
+    """
     sub = matrix[np.ix_(idx, idx)]
+    off = ~np.eye(len(idx), dtype=bool)
     sp = float(np.diag(sub).mean())
-    xp = float(sub[~np.eye(len(idx), dtype=bool)].mean())
-    return {"sp": sp, "xp": xp, "gap": sp - xp, **{k: float(v[idx].mean()) for k, v in per_run.items()}}
+    xp = float(sub[off].mean())
+    out = {"sp": sp, "xp": xp, "gap": sp - xp, **{k: float(v[idx].mean()) for k, v in per_run.items()}}
+    for name, values in (pair_stats or {}).items():
+        out[name] = float(values[np.ix_(idx, idx)][off].mean())
+    return out
 
 
 def permutation_test(
@@ -104,22 +114,24 @@ def permutation_test(
     n_a: int,
     n_perm: int = 10_000,
     seed: int = 0,
+    pair_stats: dict[str, np.ndarray] | None = None,
 ) -> dict[str, float]:
     """Two-sided permutation p-values for (group A - group B) of every statistic.
 
-    ``matrix`` is the square cross-play matrix over the pooled runs, with the
-    ``n_a`` runs of A first; ``per_run`` maps names to per-run values in the same
-    order. p = (1 + #{|perm diff| >= |observed diff|}) / (1 + n_perm).
+    ``matrix`` (and every ``pair_stats`` matrix) is square over the pooled runs,
+    with the ``n_a`` runs of A first; ``per_run`` maps names to per-run values in
+    the same order. p = (1 + #{|perm diff| >= |observed diff|}) / (1 + n_perm).
     """
     n = len(matrix)
     a, b = np.arange(n_a), np.arange(n_a, n)
-    stat_a, stat_b = group_statistics(matrix, a, per_run), group_statistics(matrix, b, per_run)
+    stat_a, stat_b = group_statistics(matrix, a, per_run, pair_stats), group_statistics(matrix, b, per_run, pair_stats)
     observed = {k: stat_a[k] - stat_b[k] for k in stat_a}
     exceed = dict.fromkeys(observed, 0)
     rng = np.random.default_rng(seed)
     for _ in range(n_perm):
         order = rng.permutation(n)
-        pa, pb = group_statistics(matrix, order[:n_a], per_run), group_statistics(matrix, order[n_a:], per_run)
+        pa = group_statistics(matrix, order[:n_a], per_run, pair_stats)
+        pb = group_statistics(matrix, order[n_a:], per_run, pair_stats)
         for k in observed:
             exceed[k] += abs(pa[k] - pb[k]) >= abs(observed[k]) - 1e-12
     return {k: (1 + exceed[k]) / (1 + n_perm) for k in observed}
@@ -131,5 +143,6 @@ def difference(a: Estimate, b: Estimate) -> dict[str, float]:
     Returns the point difference and a percentile 95% CI from the two
     independent bootstrap distributions. Use ``permutation_test`` for p-values.
     """
-    lo, hi = np.nanpercentile(a.samples - b.samples, [2.5, 97.5])
-    return {"diff": a.mean - b.mean, "ci_lo": float(lo), "ci_hi": float(hi)}
+    samples = a.samples - b.samples
+    lo, hi = np.nanpercentile(samples, [2.5, 97.5])
+    return {"diff": a.mean - b.mean, "ci_lo": float(lo), "ci_hi": float(hi), "sd": float(np.nanstd(samples))}

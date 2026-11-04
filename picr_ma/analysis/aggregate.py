@@ -10,8 +10,8 @@ import pandas as pd
 
 from picr_ma.analysis.stats import Estimate, bootstrap_mean, bootstrap_pairs, difference, permutation_test, resample_runs
 
-METHOD_ORDER = ("ippo", "picr", "deepsets", "order_aug")
-METHOD_LABELS = {"ippo": "IPPO", "picr": "PICR", "deepsets": "Deep Sets", "order_aug": "Order aug."}
+METHOD_ORDER = ("ippo", "picr", "deepsets", "order_aug", "order_rand")
+METHOD_LABELS = {"ippo": "IPPO", "picr": "PICR", "deepsets": "Deep Sets", "order_aug": "Order aug.", "order_rand": "Order rand."}
 ENV_LABELS = {"simple_spread_v3": "Spread", "simple_adversary_v3": "Adversary"}
 
 
@@ -38,10 +38,23 @@ def load_crossplay(suite_dir: str | Path, env: str) -> pd.DataFrame:
     return pd.read_csv(Path(suite_dir) / env / "crossplay.csv")
 
 
-def crossplay_block(xp: pd.DataFrame, ego: str, partner: str) -> np.ndarray:
-    """(n_ego_seeds, n_partner_seeds) matrix of mean cross-play returns, seeds sorted."""
+def crossplay_block(xp: pd.DataFrame, ego: str, partner: str, value: str = "return_mean") -> np.ndarray:
+    """(n_ego_seeds, n_partner_seeds) matrix of a cross-play column, seeds sorted."""
     block = xp[(xp.ego_method == ego) & (xp.partner_method == partner)]
-    return block.pivot(index="ego_seed", columns="partner_seed", values="return_mean").sort_index().sort_index(axis=1).to_numpy()
+    return block.pivot(index="ego_seed", columns="partner_seed", values=value).sort_index().sort_index(axis=1).to_numpy()
+
+
+def slot_contrast_block(xp: pd.DataFrame, ego: str, partner: str) -> np.ndarray:
+    """Cross-play with the ego in slot 0 minus with the ego in the last slot.
+
+    MPE lists teammates in index order, so in slot 0 both partners list the ego
+    as their first teammate and in the last slot both list it second. The two
+    seatings differ only by teammate order (reversing every agent's list turns
+    one into the other), so the contrast is zero in expectation unless the
+    policies' returns depend on teammate order.
+    """
+    last = max(int(c.removeprefix("return_mean_slot")) for c in xp.columns if c.startswith("return_mean_slot"))
+    return crossplay_block(xp, ego, partner, "return_mean_slot0") - crossplay_block(xp, ego, partner, f"return_mean_slot{last}")
 
 
 def load_order_shift(suite_dir: str | Path, env: str) -> pd.DataFrame | None:
@@ -80,7 +93,10 @@ def method_estimates(
     sp       self-play return (diagonal of the cross-play matrix: same seeds,
              same episodes as cross-play)
     xp       cross-play return with independently trained partners of the same method
-    gap      sp - xp, bootstrapped jointly over seeds
+    gap      sp - xp, bootstrapped jointly over seeds (the primary endpoint:
+             individual competence cancels in the difference)
+    slot_contrast  cross-play with the ego listed first by both partners minus
+             listed second (see ``slot_contrast_block``); zero unless order matters
     perm_js  permutation sensitivity on self-play evaluation states
     flip     fraction of (state, permutation) pairs whose greedy action changes
     shift_drop, relabel_drop, resample_drop
@@ -104,6 +120,8 @@ def method_estimates(
             "perm_js": bootstrap_mean(runs.perm_js.to_numpy(), seed=i),
             "flip": bootstrap_mean(runs.perm_flip_rate.to_numpy(), seed=i),
         }
+        if any(c.startswith("return_mean_slot") for c in xp.columns):
+            out[method]["slot_contrast"] = bootstrap_pairs(slot_contrast_block(xp, method, method), same_population=True, seed=i)
         if shift is not None:
             per_run = order_shift_per_run(shift, method)
             for key in SHIFT_METRICS:
@@ -124,6 +142,16 @@ def _gap_samples(block: np.ndarray, n_boot: int = 10_000, seed: int = 0) -> np.n
     return samples
 
 
+def holm(p_values: dict[str, float]) -> dict[str, float]:
+    """Holm-Bonferroni adjusted p-values for a family of tests."""
+    names = sorted(p_values, key=p_values.get)
+    adjusted, running = {}, 0.0
+    for rank, name in enumerate(names):
+        running = max(running, min(1.0, (len(names) - rank) * p_values[name]))
+        adjusted[name] = running
+    return adjusted
+
+
 def compare_to(
     estimates: dict[str, dict[str, Estimate]],
     summaries: pd.DataFrame,
@@ -133,7 +161,14 @@ def compare_to(
     n_perm: int = 10_000,
     shift: pd.DataFrame | None = None,
 ) -> dict[str, dict[str, dict[str, float]]]:
-    """Each method minus the baseline: point difference, bootstrap 95% CI and permutation p-value."""
+    """Each method minus the baseline, for every metric.
+
+    diff, ci_lo, ci_hi  point difference and bootstrap 95% interval
+    mde                 minimum detectable effect, 2.8 x the bootstrap SD of the
+                        difference (80% power, two-sided alpha = 0.05)
+    p                   permutation-test p-value over run labels
+    p_holm              p adjusted with Holm's method across the compared methods
+    """
     out = {}
     for method, metrics in estimates.items():
         if method == baseline:
@@ -146,9 +181,23 @@ def compare_to(
             shifts = [order_shift_per_run(shift, m) for m in order]
             for key in SHIFT_METRICS:
                 per_run[key] = np.concatenate([x[key].to_numpy() for x in shifts])
+        pair_stats = None
+        if "slot_contrast" in metrics:
+            pair_stats = {
+                "slot_contrast": np.block([[slot_contrast_block(xp, ego, partner) for partner in order] for ego in order])
+            }
         n_a = int((runs.variant == method).sum())
-        p_values = permutation_test(matrix, per_run, n_a, n_perm=n_perm)
-        out[method] = {name: {**difference(metrics[name], estimates[baseline][name]), "p": p_values[name]} for name in metrics}
+        p_values = permutation_test(matrix, per_run, n_a, n_perm=n_perm, pair_stats=pair_stats)
+        out[method] = {}
+        for name in metrics:
+            if name not in p_values:
+                continue
+            diff = difference(metrics[name], estimates[baseline][name])
+            out[method][name] = {**diff, "mde": 2.8 * diff["sd"], "p": p_values.get(name, float("nan"))}
+    for name in {n for comp in out.values() for n in comp}:
+        family = {m: comp[name]["p"] for m, comp in out.items() if name in comp and not np.isnan(comp[name]["p"])}
+        for m, p in holm(family).items():
+            out[m][name]["p_holm"] = p
     return out
 
 

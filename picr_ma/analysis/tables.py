@@ -1,51 +1,97 @@
-"""LaTeX and Markdown tables generated from analysis results."""
+"""LaTeX and Markdown tables, and the LaTeX number macros, generated from analysis results.
+
+Every number is typeset in math mode so negative values get a proper minus sign.
+"""
 
 from __future__ import annotations
 
 from picr_ma.analysis.aggregate import ENV_LABELS, METHOD_LABELS, METHOD_ORDER
 
+ENV_MACRO = {"simple_spread_v3": "Spread", "simple_adversary_v3": "Adversary"}
+METHOD_MACRO = {"ippo": "IPPO", "picr": "PICR", "deepsets": "DeepSets", "order_aug": "OrderAug", "order_rand": "OrderRand"}
+# metric key -> (macro suffix, scale, format)
+METRIC_MACRO = {
+    "sp": ("SP", 1.0, "{:.2f}"),
+    "xp": ("XP", 1.0, "{:.2f}"),
+    "gap": ("Gap", 1.0, "{:.2f}"),
+    "perm_js": ("JS", 1e3, "{:.1f}"),
+    "flip": ("Flip", 1.0, "{:.2f}"),
+    "slot_contrast": ("Slot", 1.0, "{:.2f}"),
+    "shift_drop": ("Shift", 1.0, "{:.2f}"),
+    "relabel_drop": ("Relabel", 1.0, "{:.2f}"),
+    "resample_drop": ("Resample", 1.0, "{:.2f}"),
+}
 
-def _ci(e, fmt: str = "{:.2f}", scale: float = 1.0) -> str:
-    return f"{fmt.format(scale * e.mean)} \\scriptsize{{[{fmt.format(scale * e.lo)}, {fmt.format(scale * e.hi)}]}}"
+
+def _num(value: float, fmt: str = "{:.2f}", signed: bool = False) -> str:
+    """Math-mode number, e.g. $-1.23$ or (signed) $+0.40$."""
+    return "$" + (("{:+" + fmt[2:]) if signed else fmt).format(value) + "$"
 
 
-def main_table(estimates_by_env: dict) -> str:
-    lines = [
-        r"\begin{tabular}{llccccc}",
-        r"\toprule",
-        r"Env. & Method & Self-play $\uparrow$ & Cross-play $\uparrow$ & SP$-$XP gap $\downarrow$ & Perm.\ JS ($\times 10^{-3}$) $\downarrow$ & Order-shift drop $\downarrow$ \\",
-        r"\midrule",
-    ]
+def _interval(lo: float, hi: float, fmt: str = "{:.2f}", signed: bool = False) -> str:
+    f = ("{:+" + fmt[2:]) if signed else fmt
+    return f"$[{f.format(lo)}, {f.format(hi)}]$"
+
+
+def _p(p: float) -> str:
+    return f"${p:.3f}$" if p >= 1e-3 else "$<0.001$"
+
+
+def _cell(e, key: str) -> str:
+    _, scale, fmt = METRIC_MACRO[key]
+    return f"{_num(scale * e.mean, fmt)} \\scriptsize{{{_interval(scale * e.lo, scale * e.hi, fmt)}}}"
+
+
+def _rows(estimates_by_env: dict, keys: list[str]) -> list[str]:
+    lines = []
     for k, (env, est) in enumerate(estimates_by_env.items()):
         if k:
             lines.append(r"\midrule")
         for method in [m for m in METHOD_ORDER if m in est]:
             e = est[method]
-            shift = _ci(e["shift_drop"]) if "shift_drop" in e else "--"
-            lines.append(
-                f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & {_ci(e['sp'])} & {_ci(e['xp'])} & {_ci(e['gap'])} & "
-                f"{_ci(e['perm_js'], '{:.1f}', 1e3)} & {shift} \\\\"
-            )
-    lines += [r"\bottomrule", r"\end{tabular}"]
+            cells = [_cell(e[key], key) if key in e else "--" for key in keys]
+            lines.append(f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & " + " & ".join(cells) + r" \\")
+    return lines
+
+
+def main_table(estimates_by_env: dict) -> str:
+    keys = ["sp", "xp", "gap", "perm_js", "shift_drop"]
+    header = (
+        r"Env. & Method & Self-play $\uparrow$ & Cross-play $\uparrow$ & SP$-$XP gap $\downarrow$ & "
+        r"Perm.\ JS ($\times 10^{-3}$) & Order-shift drop \\"
+    )
+    lines = [r"\begin{tabular}{ll" + "c" * len(keys) + "}", r"\toprule", header, r"\midrule"]
+    lines += _rows(estimates_by_env, keys) + [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines) + "\n"
 
 
-def _p(p: float) -> str:
-    return f"{p:.3f}" if p >= 1e-3 else "$<$0.001"
+def order_table(estimates_by_env: dict) -> str:
+    """Appendix: every order-related measure, including the controls."""
+    keys = ["flip", "slot_contrast", "shift_drop", "relabel_drop", "resample_drop"]
+    header = (
+        r"Env. & Method & Greedy-action flip rate & Slot contrast & Genuine order shift & "
+        r"Relabeling (null) & Teammates resampled \\"
+    )
+    lines = [r"\begin{tabular}{ll" + "c" * len(keys) + "}", r"\toprule", header, r"\midrule"]
+    lines += _rows(estimates_by_env, keys) + [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+COMPARISON_COLUMNS = [
+    ("gap", r"$\Delta$ SP$-$XP gap (primary)"),
+    ("xp", r"$\Delta$ Cross-play"),
+    ("perm_js", r"$\Delta$ Perm.\ JS ($\times 10^{-3}$)"),
+    ("shift_drop", r"$\Delta$ Order-shift drop"),
+]
 
 
 def comparison_table(comparisons_by_env: dict) -> str:
-    columns = [("xp", 1, "{:+.2f}", r"$\Delta$ Cross-play"), ("gap", 1, "{:+.2f}", r"$\Delta$ SP$-$XP gap")]
-    columns += [
-        ("perm_js", 1e3, "{:+.1f}", r"$\Delta$ Perm.\ JS ($\times 10^{-3}$)"),
-        ("shift_drop", 1, "{:+.2f}", r"$\Delta$ Order-shift drop"),
-    ]
     first = next(iter(comparisons_by_env.values()))
-    columns = [c for c in columns if all(c[0] in m for m in first.values())]
+    columns = [(k, h) for k, h in COMPARISON_COLUMNS if all(k in m for m in first.values())]
     lines = [
         r"\begin{tabular}{ll" + "c" * len(columns) + "}",
         r"\toprule",
-        "Env. & Method & " + " & ".join(c[3] for c in columns) + r" \\",
+        "Env. & Method & " + " & ".join(h for _, h in columns) + r" \\",
         r"\midrule",
     ]
     for k, (env, comp) in enumerate(comparisons_by_env.items()):
@@ -53,10 +99,11 @@ def comparison_table(comparisons_by_env: dict) -> str:
             lines.append(r"\midrule")
         for method in [m for m in METHOD_ORDER if m in comp]:
             cells = []
-            for key, scale, fmt, _ in columns:
-                d = comp[method][key]
+            for key, _ in columns:
+                d, (_, scale, fmt) = comp[method][key], METRIC_MACRO[key]
+                interval = _interval(scale * d["ci_lo"], scale * d["ci_hi"], fmt, signed=True)
                 cells.append(
-                    f"{fmt.format(scale * d['diff'])} \\scriptsize{{[{fmt.format(scale * d['ci_lo'])}, {fmt.format(scale * d['ci_hi'])}], $p$={_p(d['p'])}}}"
+                    f"{_num(scale * d['diff'], fmt, signed=True)} \\scriptsize{{{interval}, $p_\\mathrm{{Holm}}$={_p(d['p_holm'])}}}"
                 )
             lines.append(f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & " + " & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
@@ -65,18 +112,19 @@ def comparison_table(comparisons_by_env: dict) -> str:
 
 def markdown_table(estimates_by_env: dict) -> str:
     rows = [
-        "| Env | Method | Self-play ↑ | Cross-play ↑ | SP−XP gap ↓ | Perm. JS (×10⁻³) ↓ | Order-shift drop ↓ |",
+        "| Env | Method | Self-play ↑ | Cross-play ↑ | SP−XP gap ↓ | Perm. JS (×10⁻³) | Order-shift drop |",
         "|---|---|---|---|---|---|---|",
     ]
-    fmt = lambda x, s=1.0, f="{:.2f}": f"{f.format(s * x.mean)} [{f.format(s * x.lo)}, {f.format(s * x.hi)}]"  # noqa: E731
+
+    def fmt(e, key):
+        _, scale, f = METRIC_MACRO[key]
+        return f"{f.format(scale * e.mean)} [{f.format(scale * e.lo)}, {f.format(scale * e.hi)}]".replace("-", "−")
+
     for env, est in estimates_by_env.items():
         for method in [m for m in METHOD_ORDER if m in est]:
             e = est[method]
-            shift = fmt(e["shift_drop"]) if "shift_drop" in e else "–"
-            rows.append(
-                f"| {ENV_LABELS.get(env, env)} | {METHOD_LABELS[method]} | {fmt(e['sp'])} | {fmt(e['xp'])} | {fmt(e['gap'])} | "
-                f"{fmt(e['perm_js'], 1e3, '{:.1f}')} | {shift} |"
-            )
+            cells = [fmt(e[k], k) if k in e else "–" for k in ("sp", "xp", "gap", "perm_js", "shift_drop")]
+            rows.append(f"| {ENV_LABELS.get(env, env)} | {METHOD_LABELS[method]} | " + " | ".join(cells) + " |")
     return "\n".join(rows) + "\n"
 
 
@@ -87,36 +135,18 @@ def overhead_table(overhead: dict) -> str:
         r"Env. & Method & PPO update (s) & Inference forward (ms) & Actor parameters \\",
         r"\midrule",
     ]
-    for k, (env, methods) in enumerate(overhead["envs"].items()):
+    for k, (env, entry) in enumerate(overhead["envs"].items()):
+        methods = entry["methods"]
         if k:
             lines.append(r"\midrule")
         for method in [m for m in METHOD_ORDER if m in methods]:
             r = methods[method]
             lines.append(
-                f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & {r['update_seconds']:.2f} ({r['update_vs_ippo']:.2f}$\\times$) & "
-                f"{r['forward_ms']:.3f} ({r['forward_vs_ippo']:.2f}$\\times$) & {r['actor_params']} \\\\"
+                f"{ENV_LABELS.get(env, env)} & {METHOD_LABELS[method]} & ${r['update_seconds']:.2f}$ (${r['update_vs_ippo']:.2f}\\times$) & "
+                f"${r['forward_ms']:.3f}$ (${r['forward_vs_ippo']:.2f}\\times$) & ${r['actor_params']}$ \\\\"
             )
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines) + "\n"
-
-
-ENV_MACRO = {"simple_spread_v3": "Spread", "simple_adversary_v3": "Adversary"}
-METHOD_MACRO = {"ippo": "IPPO", "picr": "PICR", "deepsets": "DeepSets", "order_aug": "OrderAug"}
-METRIC_MACRO = {
-    "sp": ("SP", 1.0, "{:.2f}"),
-    "xp": ("XP", 1.0, "{:.2f}"),
-    "gap": ("Gap", 1.0, "{:.2f}"),
-    "perm_js": ("JS", 1e3, "{:.1f}"),
-    "flip": ("Flip", 1.0, "{:.2f}"),
-    "shift_drop": ("Shift", 1.0, "{:.2f}"),
-    "relabel_drop": ("Relabel", 1.0, "{:.2f}"),
-    "resample_drop": ("Resample", 1.0, "{:.2f}"),
-}
-
-
-def _num(value: float, fmt: str, signed: bool = False) -> str:
-    """Math-mode number, e.g. $-1.23$ or (signed) $+0.40$."""
-    return "$" + (("{:+" + fmt[2:]) if signed else fmt).format(value) + "$"
 
 
 def numbers_tex(estimates_by_env: dict, comparisons_by_env: dict, report: dict) -> str:
@@ -131,11 +161,10 @@ def numbers_tex(estimates_by_env: dict, comparisons_by_env: dict, report: dict) 
         for method, metrics in est.items():
             m_name = METHOD_MACRO[method]
             for key, (k_name, scale, fmt) in METRIC_MACRO.items():
-                if key not in metrics:
-                    continue
-                x = metrics[key]
-                define(f"{e_name}{m_name}{k_name}", _num(scale * x.mean, fmt))
-                define(f"{e_name}{m_name}{k_name}ci", f"[{fmt.format(scale * x.lo)}, {fmt.format(scale * x.hi)}]")
+                if key in metrics:
+                    x = metrics[key]
+                    define(f"{e_name}{m_name}{k_name}", _num(scale * x.mean, fmt))
+                    define(f"{e_name}{m_name}{k_name}ci", _interval(scale * x.lo, scale * x.hi, fmt))
         for method, comp in comparisons_by_env.get(env, {}).items():
             m_name = METHOD_MACRO[method]
             for key, (k_name, scale, fmt) in METRIC_MACRO.items():
@@ -143,22 +172,37 @@ def numbers_tex(estimates_by_env: dict, comparisons_by_env: dict, report: dict) 
                     continue
                 d = comp[key]
                 define(f"{e_name}{m_name}d{k_name}", _num(scale * d["diff"], fmt, signed=True))
-                define(f"{e_name}{m_name}d{k_name}ci", f"[{fmt.format(scale * d['ci_lo'])}, {fmt.format(scale * d['ci_hi'])}]")
-                define(f"{e_name}{m_name}d{k_name}p", f"$p{{=}}{d['p']:.3f}$" if d["p"] >= 1e-3 else "$p{<}0.001$")
-        for method, rho in report.get("within_method_spearman_perm_js_vs_xp", {}).get(env, {}).items():
-            define(f"{e_name}{METHOD_MACRO[method]}Rho", _num(rho, "{:.2f}"))
+                define(f"{e_name}{m_name}d{k_name}ci", _interval(scale * d["ci_lo"], scale * d["ci_hi"], fmt, signed=True))
+                define(f"{e_name}{m_name}d{k_name}mde", _num(scale * d["mde"], fmt))
+                define(f"{e_name}{m_name}d{k_name}p", _p(d["p"]))
+                if "p_holm" in d:
+                    define(f"{e_name}{m_name}d{k_name}ph", _p(d["p_holm"]))
+        for method, rho in report.get("within_method_spearman_perm_js_vs_compatibility", {}).get(env, {}).items():
+            define(f"{e_name}{METHOD_MACRO[method]}Rho", _num(rho))
     for env, dec in report.get("additive_decomposition", {}).items():
         e_name = ENV_MACRO[env]
-        define(f"{e_name}AddRsq", f"{100 * dec['r2_additive']:.1f}\\%")
-        define(f"{e_name}EgoPartnerCorr", _num(dec["corr_ego_partner_effect"], "{:.2f}"))
-        define(f"{e_name}ResidSD", _num(dec["sd_residual"], "{:.2f}"))
-        define(f"{e_name}TotalSD", _num(dec["sd_total"], "{:.2f}"))
+        define(f"{e_name}AddRsq", f"${100 * dec['r2_additive']:.1f}\\%$")
+        define(f"{e_name}EgoPartnerCorr", _num(dec["corr_ego_partner_effect"]))
+        define(f"{e_name}ResidSD", _num(dec["sd_residual"]))
+        define(f"{e_name}TotalSD", _num(dec["sd_total"]))
         if "residual_split_half_corr" in dec:
-            define(f"{e_name}ResidRel", _num(dec["residual_split_half_corr"], "{:.2f}"))
+            define(f"{e_name}ResidRel", _num(dec["residual_split_half_corr"]))
     for env, lam in report.get("selected_lambda", {}).items():
         define(f"{ENV_MACRO[env]}Lambda", f"{lam:g}")
     ref = report.get("reference_returns", {})
     for key, name in [("random", "RefRandom"), ("noop", "RefNoop"), ("assignment", "RefAssign")]:
         if key in ref:
-            define(name, _num(ref[key]["mean"], "{:.2f}"))
+            define(name, _num(ref[key]["mean"]))
+    control = report.get("positive_control", {})
+    for key, name in [("one_convention", "PCOne"), ("two_conventions", "PCTwo")]:
+        if key in control:
+            define(f"{name}Gap", _num(control[key]["gap"]))
+            define(f"{name}Rsq", f"${100 * control[key]['r2_additive']:.1f}\\%$")
+            define(f"{name}ResidRel", _num(control[key]["residual_split_half_corr"]))
+    for key, name in [("first_teammate_landmark", "PCOrder"), ("greedy_west", "PCInvariant")]:
+        if key in control:
+            for kind in ("relabeling", "genuine", "resampled"):
+                define(f"{name}{kind.capitalize()}", _num(control[key][f"change_{kind}"], signed=True))
+    if "env_speed" in report:
+        define("EnvSpeedup", f"{report['env_speed']['speedup']:.0f}")
     return "\n".join(lines) + "\n"

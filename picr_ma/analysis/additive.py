@@ -67,3 +67,20 @@ def additive_decomposition(xp: pd.DataFrame) -> dict[str, float]:
         r1, r2 = residuals(pair_matrix(xp, "return_mean_half1")[0]), residuals(pair_matrix(xp, "return_mean_half2")[0])
         out["residual_split_half_corr"] = float(np.corrcoef(r1, r2)[0, 1])
     return out
+
+
+def run_compatibility(xp: pd.DataFrame) -> pd.DataFrame:
+    """Per run: mean additive-model residual over its pairings as ego and as partner.
+
+    A run whose conventions clash with its partners' scores below what the
+    individual competences predict, so a negative value means "less
+    compatible than its skill implies". Competence itself is removed.
+    """
+    matrix, runs = pair_matrix(xp)
+    mu, a, b = fit_additive(matrix)
+    res = matrix - (mu + a[:, None] + b[None, :])
+    np.fill_diagonal(res, np.nan)
+    score = 0.5 * (np.nanmean(res, axis=1) + np.nanmean(res, axis=0))
+    return pd.DataFrame(
+        {"method": [r.split("/")[0] for r in runs], "seed": [int(r.split("/")[1]) for r in runs], "compatibility": score}
+    )

@@ -18,9 +18,9 @@ import pandas as pd  # noqa: E402
 
 from picr_ma.analysis.aggregate import ENV_LABELS, METHOD_LABELS, METHOD_ORDER  # noqa: E402
 
-COLORS = {"ippo": "#2a78d6", "picr": "#eb6834", "deepsets": "#1baf7a", "order_aug": "#eda100"}
-MARKERS = {"ippo": "o", "picr": "s", "deepsets": "^", "order_aug": "D"}
-LINESTYLES = {"ippo": "-", "picr": "-", "deepsets": "--", "order_aug": ":"}
+COLORS = {"ippo": "#2a78d6", "picr": "#eb6834", "deepsets": "#1baf7a", "order_aug": "#eda100", "order_rand": "#e87ba4"}
+MARKERS = {"ippo": "o", "picr": "s", "deepsets": "^", "order_aug": "D", "order_rand": "v"}
+LINESTYLES = {"ippo": "-", "picr": "-", "deepsets": "--", "order_aug": ":", "order_rand": "-."}
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
 plt.rcParams.update(
@@ -134,7 +134,12 @@ def sp_vs_xp(estimates_by_env: dict, out: Path) -> None:
 
 
 def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path) -> None:
-    """Each point is one run: its permutation sensitivity vs its mean cross-play return."""
+    """Each point is one run: its permutation sensitivity vs its competence-adjusted compatibility.
+
+    Compatibility is the run's mean residual from the additive (ego + partner
+    skill) model of cross-play: negative means it does worse with partners than
+    their and its own skill predict.
+    """
     envs = list(per_run_by_env)
     fig, axes = plt.subplots(1, len(envs), figsize=(3.3 * len(envs), 2.4), squeeze=False)
     for ax, env in zip(axes[0], envs):
@@ -146,7 +151,7 @@ def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path)
             x = np.maximum(r.perm_js, 1e-6)
             ax.scatter(
                 x,
-                r.xp,
+                r.compatibility,
                 marker=MARKERS[method],
                 s=22,
                 color=COLORS[method],
@@ -157,7 +162,8 @@ def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path)
             )
         ax.set_xscale("log")
         ax.set_xlabel("Permutation JS (log; Deep Sets clipped to 1e-6)")
-        ax.set_ylabel("Cross-play return")
+        ax.set_ylabel("Compatibility (residual return)")
+        ax.axhline(0, color=MUTED, lw=0.6)
         ax.set_title(ENV_LABELS.get(env, env))
     axes[0, 0].legend(frameon=False, loc="best")
     _save(fig, out)
