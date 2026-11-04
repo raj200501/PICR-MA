@@ -3,9 +3,18 @@
 * Every run directory under results/ is one the config file defines, and its
   stored config is exactly the config the file now produces.
 * For one run of every (suite, environment, method) group, retraining up to the
-  first logged update with the current code reproduces that run's committed
-  training log. Bitwise equality holds on the machine type that produced the
-  results; other CPUs can change float32 summation order, hence the tolerance.
+  first logged update (5 PPO updates) with the current code reproduces that
+  run's committed training log.
+
+The rerun is bitwise identical on the machine type that produced the results.
+Other CPUs can sum float32 products in a different order, which perturbs the
+weights very slightly. Batch means of large terms (return, value loss, entropy,
+permutation sensitivity) still agree to well under 1%. The PPO policy loss,
+approximate KL and clip fraction are small averages of terms that nearly
+cancel, so in relative terms they move more (0.7% was seen on a GitHub runner).
+The tolerances still catch real changes: another seed, 9 instead of 10 epochs,
+or a 10% higher learning rate each moved at least two fields of every run
+checked beyond them.
 """
 
 from __future__ import annotations
@@ -31,6 +40,11 @@ def _finished_runs():
         for run in expand_suite(SPEC, suite, RESULTS):
             if (run.out_dir / "summary.json").exists():
                 yield run
+
+
+# Relative tolerance per logged field (see the module docstring).
+TOLERANCE = {"env_steps": 0.0, "policy_loss": 0.05, "approx_kl": 0.05, "clip_frac": 0.05}
+DEFAULT_TOLERANCE = 5e-3
 
 
 def _first_logged_row(path: Path) -> dict[str, str]:
@@ -67,6 +81,6 @@ def test_current_code_reproduces_committed_training(run, tmp_path):
     mismatched = {
         k: (committed[k], rerun[k])
         for k in committed
-        if not math.isclose(float(rerun[k]), float(committed[k]), rel_tol=1e-3, abs_tol=1e-5)
+        if not math.isclose(float(rerun[k]), float(committed[k]), rel_tol=TOLERANCE.get(k, DEFAULT_TOLERANCE), abs_tol=1e-6)
     }
     assert not mismatched, f"committed vs. rerun: {mismatched}"
