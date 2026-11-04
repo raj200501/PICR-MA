@@ -5,8 +5,8 @@ PYTHON ?= python
 WORKERS ?= 4
 
 .NOTPARALLEL:
-.PHONY: install test lint tuning lambda select main crossplay-main order-shift reference positive-control env-speed \
-	overhead evaluate figures analyze paper reproduce
+.PHONY: install test lint tuning lambda select main crossplay-main order-shift long reference positive-control \
+	env-speed overhead evaluate figures analyze paper reproduce
 
 install:
 	$(PYTHON) -m pip install -r requirements.lock --extra-index-url https://download.pytorch.org/whl/cpu
@@ -58,7 +58,13 @@ env-speed:
 overhead:
 	$(PYTHON) scripts/benchmark_overhead.py
 
-evaluate: crossplay-main order-shift reference positive-control env-speed overhead
+# Supplementary training-budget check: twice the steps on simple_spread, new seeds.
+long: select
+	$(PYTHON) scripts/run_experiments.py --suite long --workers $(WORKERS)
+	$(PYTHON) scripts/crossplay.py --suite long --workers $(WORKERS)
+	$(PYTHON) scripts/order_shift.py --suite long --workers $(WORKERS)
+
+evaluate: crossplay-main order-shift long reference positive-control env-speed overhead
 
 # 4. Tables, figures and numbers from results/ (no training or evaluation).
 figures:

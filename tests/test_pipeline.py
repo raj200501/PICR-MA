@@ -34,6 +34,13 @@ CONFIG = {
             "picr_lambda_by_env": {"simple_spread_v3": None, "simple_adversary_v3": None},
             "seeds": [0, 1, 2],
         },
+        "long": {
+            "envs": ["simple_spread_v3"],
+            "methods": ["ippo", "picr", "deepsets"],
+            "total_steps": 400,
+            "picr_lambda_by_env": {"simple_spread_v3": None},
+            "seeds": [20, 21],
+        },
     },
 }
 
@@ -58,11 +65,15 @@ def test_full_pipeline(tmp_path):
     _run("select_lambda.py", *common)
     selection = json.loads((results / "lambda" / "selection.json").read_text())
     CONFIG["suites"]["main"]["picr_lambda_by_env"] = {env: v["selected_lambda"] for env, v in selection.items()}
+    CONFIG["suites"]["long"]["picr_lambda_by_env"] = {"simple_spread_v3": selection["simple_spread_v3"]["selected_lambda"]}
     config.write_text(yaml.safe_dump(CONFIG))
 
     _run("run_experiments.py", "--suite", "main", "--config", config, *common, "--workers", 2)
     _run("crossplay.py", "--suite", "main", *common, "--episodes", 8, "--workers", 2)
     _run("order_shift.py", "--suite", "main", *common, "--episodes", 8, "--workers", 2)
+    _run("run_experiments.py", "--suite", "long", "--config", config, *common, "--workers", 2)
+    _run("crossplay.py", "--suite", "long", *common, "--episodes", 8, "--workers", 2)
+    _run("order_shift.py", "--suite", "long", *common, "--episodes", 8, "--workers", 2)
     _run("reference_returns.py", *common, "--episodes", 16)
     _run("positive_control.py", *common, "--episodes", 8)
     _run("benchmark_env.py", *common, "--episodes", 20)
@@ -78,6 +89,8 @@ def test_full_pipeline(tmp_path):
         "SpreadAddRsq",
         "SpreadLambda",
         "RefAssign",
+        "LongSpreadDeepSetsGap",
+        "LongSpreadPICRdGapp",
     ]:
         assert f"\\newcommand{{\\{macro}}}" in numbers, macro
     # Every generated macro the paper uses is defined.
@@ -86,14 +99,14 @@ def test_full_pipeline(tmp_path):
         m
         for tex in (ROOT / "paper").glob("**/*.tex")
         if "tables" not in tex.parts
-        for m in re.findall(r"\\((?:Spread|Adversary|Ref|PC|EnvSpeedup)\w*)", tex.read_text())
+        for m in re.findall(r"\\((?:Spread|Adversary|Long|Ref|PC|EnvSpeedup)\w*)", tex.read_text())
     }
     assert used <= defined, sorted(used - defined)
-    for table in ["main_results", "comparison", "order_measures", "overhead"]:
+    for table in ["main_results", "comparison", "order_measures", "overhead", "long_budget"]:
         assert (paper / "tables" / f"{table}.tex").exists()
     report = json.loads((results / "analysis.json").read_text())
     assert set(report["estimates"]["simple_spread_v3"]) == set(CONFIG["suites"]["main"]["methods"])
-    assert report["provenance"]["git_commit"] and set(report["compute"]) == {"main", "lambda"}
+    assert report["provenance"]["git_commit"] and set(report["compute"]) == {"main", "lambda", "long"}
     assert json.loads((results / "main" / "simple_spread_v3" / "crossplay.provenance.json").read_text())["split"] == "test"
     assert (tmp_path / "png" / "order_shift.png").exists()
 

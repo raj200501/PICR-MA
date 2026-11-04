@@ -25,8 +25,11 @@ def load_summaries(suite_dir: str | Path) -> pd.DataFrame:
 
 
 def load_curves(suite_dir: str | Path, env: str) -> pd.DataFrame:
+    """Training logs of the finished runs (an unfinished run's log is still being written)."""
     frames = []
     for path in sorted((Path(suite_dir) / env).glob("*/seed*/metrics.csv.gz")):
+        if not (path.parent / "summary.json").exists():
+            continue
         frame = pd.read_csv(path)
         frame["variant"] = path.parent.parent.name
         frame["seed"] = int(path.parent.name.removeprefix("seed"))

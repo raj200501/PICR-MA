@@ -50,13 +50,10 @@ REQUIRED = {
 }
 
 
-def check_inputs(results_dir: Path, envs: list[str]) -> None:
-    missing = sorted(
-        f"{path}  (make {target})"
-        for pattern, target in REQUIRED.items()
-        for path in {pattern.format(env=env) for env in envs}
-        if not (results_dir / path).exists()
-    )
+def check_inputs(results_dir: Path, envs: list[str], long_envs: list[str]) -> None:
+    required = {**{pattern.format(env=env): t for pattern, t in REQUIRED.items() for env in envs}}
+    required.update({f"long/{env}/{name}": "long" for env in long_envs for name in ("crossplay.csv", "order_shift.csv")})
+    missing = sorted(f"{path}  (make {target})" for path, target in required.items() if not (results_dir / path).exists())
     if missing:
         raise SystemExit("Missing inputs in " + str(results_dir) + ":\n  " + "\n  ".join(missing))
 
@@ -163,12 +160,15 @@ def main() -> None:
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
 
-    main_dir = args.results_dir / "main"
-    check_complete("main", args.results_dir, args.config)
-    check_complete("lambda", args.results_dir, args.config)
+    main_dir, long_dir = args.results_dir / "main", args.results_dir / "long"
+    suites = load_suites(args.config)["suites"]
+    for suite in ("main", "lambda", "long"):
+        if suite in suites:
+            check_complete(suite, args.results_dir, args.config)
     summaries = load_summaries(main_dir)
     envs = [e for e in ("simple_spread_v3", "simple_adversary_v3") if e in set(summaries.env)]
-    check_inputs(args.results_dir, envs)
+    long_envs = [e for e in envs if e in suites.get("long", {}).get("envs", [])]
+    check_inputs(args.results_dir, envs, long_envs)
     estimates, comparisons, curves, per_run, matrices, crossplays = {}, {}, {}, {}, {}, {}
     for env in envs:
         xp = load_crossplay(main_dir, env)
@@ -207,10 +207,26 @@ def main() -> None:
     figures.lambda_sweep(sweep, fig_dir / "lambda_sweep.pdf")
     report["lambda_sweep"] = sweep.round(5).to_dict(orient="records")
     report["compute"] = {"main": compute_record(summaries), "lambda": compute_record(load_summaries(lambda_dir))}
+    long = None
+    if long_envs:
+        long_summaries = load_summaries(long_dir)
+        long = ({}, {})
+        for env in long_envs:
+            xp, shift = load_crossplay(long_dir, env), load_order_shift(long_dir, env)
+            long[0][env] = method_estimates(long_summaries, xp, env, shift=shift)
+            long[1][env] = compare_to(long[0][env], long_summaries, xp, env, n_perm=args.n_perm, shift=shift)
+        (tab_dir / "long_budget.tex").write_text(tables.long_table(*long))
+        report["long"] = {
+            "estimates": {
+                env: {m: {k: v.as_dict() for k, v in est.items()} for m, est in long[0][env].items()} for env in long_envs
+            },
+            "vs_ippo": long[1],
+        }
+        report["compute"]["long"] = compute_record(long_summaries)
     report["provenance"] = provenance()
     report["input_provenance"] = input_provenance(args.results_dir)
 
-    (tab_dir / "numbers.tex").write_text(tables.numbers_tex(estimates, comparisons, report))
+    (tab_dir / "numbers.tex").write_text(tables.numbers_tex(estimates, comparisons, report, long=long))
     (args.results_dir / "analysis.json").write_text(json.dumps(report, indent=2))
     (args.results_dir / "main_results.md").write_text(tables.markdown_table(estimates))
     print(tables.markdown_table(estimates))
