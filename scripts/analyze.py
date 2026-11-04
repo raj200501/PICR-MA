@@ -39,6 +39,7 @@ from picr_ma.provenance import provenance
 from picr_ma.train import TrainConfig
 
 ROOT = Path(__file__).resolve().parents[1]
+ENV_ORDER = ("simple_spread_v3", "simple_adversary_v3")  # order of panels, tables and table rows
 # Inputs produced by the evaluation stages, and the make target that produces each.
 REQUIRED = {
     "main/{env}/crossplay.csv": "crossplay-main",
@@ -158,7 +159,7 @@ def tuning_record(path: Path) -> dict:
 def lambda_table(suite_dir: Path) -> pd.DataFrame:
     summaries = load_summaries(suite_dir)
     rows = []
-    for env in sorted(set(summaries.env)):
+    for env in [e for e in ENV_ORDER if e in set(summaries.env)]:
         xp = load_crossplay(suite_dir, env)
         for variant in sorted(set(summaries[summaries.env == env].variant)):
             lam = float(variant.split("_lam")[1]) if "_lam" in variant else 0.0  # IPPO is the lambda = 0 reference
@@ -201,7 +202,7 @@ def main() -> None:
         if suite in suites:
             check_complete(suite, args.results_dir, args.config)
     summaries = load_summaries(main_dir)
-    envs = [e for e in ("simple_spread_v3", "simple_adversary_v3") if e in set(summaries.env)]
+    envs = [e for e in ENV_ORDER if e in set(summaries.env)]
     long_envs = [e for e in envs if e in suites.get("long", {}).get("envs", [])]
     check_inputs(args.results_dir, envs, long_envs)
     estimates, comparisons, curves, per_run, matrices, crossplays = {}, {}, {}, {}, {}, {}
