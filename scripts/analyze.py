@@ -97,7 +97,11 @@ def main() -> None:
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
     parser.add_argument("--paper-dir", type=Path, default=ROOT / "paper")
     parser.add_argument("--config", type=Path, default=ROOT / "configs" / "experiments.yaml")
+    parser.add_argument(
+        "--png-dir", type=Path, default=ROOT / "docs" / "figures", help="PNG copies of the figures, for the README"
+    )
     args = parser.parse_args()
+    figures.PNG_DIR = args.png_dir
     fig_dir, tab_dir = args.paper_dir / "figures", args.paper_dir / "tables"
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
@@ -121,6 +125,8 @@ def main() -> None:
     figures.sp_vs_xp(estimates, fig_dir / "self_play_vs_cross_play.pdf")
     figures.sensitivity_vs_crossplay(per_run, fig_dir / "sensitivity_vs_cross_play.pdf")
     figures.additive_fit(crossplays, fig_dir / "additive_fit.pdf")
+    if any("shift_drop" in e for est in estimates.values() for e in est.values()):
+        figures.order_shift(estimates, fig_dir / "order_shift.pdf")
     (tab_dir / "main_results.tex").write_text(tables.main_table(estimates))
     (tab_dir / "comparison.tex").write_text(tables.comparison_table(comparisons))
 

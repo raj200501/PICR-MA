@@ -47,6 +47,17 @@ plt.rcParams.update(
 )
 
 
+PNG_DIR: Path | None = None  # when set, every figure is also written here as a PNG (for the README)
+
+
+def _save(fig, out: Path) -> None:
+    fig.savefig(out)
+    if PNG_DIR is not None:
+        PNG_DIR.mkdir(parents=True, exist_ok=True)
+        fig.savefig(PNG_DIR / (Path(out).stem + ".png"), dpi=200, facecolor="white")
+    plt.close(fig)
+
+
 def _binned(curves: pd.DataFrame, column: str, n_bins: int = 40) -> pd.DataFrame:
     """Average each seed's curve within equal-width step bins, then pool seeds."""
     edges = np.linspace(0, curves.env_steps.max(), n_bins + 1)
@@ -85,8 +96,7 @@ def learning_curves(curves_by_env: dict[str, pd.DataFrame], out: Path) -> None:
     axes[0, 0].legend(frameon=False, loc="lower right")
     axes[1, 0].text(0.02, 0.03, "Deep Sets: 0 by construction", transform=axes[1, 0].transAxes, color=MUTED, fontsize=6.5)
     fig.align_ylabels(axes[:, 0])
-    fig.savefig(out)
-    plt.close(fig)
+    _save(fig, out)
 
 
 def sp_vs_xp(estimates_by_env: dict, out: Path) -> None:
@@ -119,9 +129,8 @@ def sp_vs_xp(estimates_by_env: dict, out: Path) -> None:
         plt.Line2D([], [], marker="o", color=MUTED, mfc="white", ls="", label="Self-play"),
         plt.Line2D([], [], marker="o", color=MUTED, ls="", label="Cross-play"),
     ]
-    fig.legend(handles=handles, frameon=False, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.06))
-    fig.savefig(out)
-    plt.close(fig)
+    fig.legend(handles=handles, frameon=False, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 1.0))
+    _save(fig, out)
 
 
 def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path) -> None:
@@ -151,8 +160,7 @@ def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path)
         ax.set_ylabel("Cross-play return")
         ax.set_title(ENV_LABELS.get(env, env))
     axes[0, 0].legend(frameon=False, loc="best")
-    fig.savefig(out)
-    plt.close(fig)
+    _save(fig, out)
 
 
 def lambda_sweep(sweep: pd.DataFrame, out: Path) -> None:
@@ -195,8 +203,7 @@ def lambda_sweep(sweep: pd.DataFrame, out: Path) -> None:
         ax.set_xscale("symlog", linthresh=0.01)
     axes[1, 0].legend(frameon=False, loc="best")
     fig.align_ylabels(axes[:, 0])
-    fig.savefig(out)
-    plt.close(fig)
+    _save(fig, out)
 
 
 def additive_fit(xp_by_env: dict, out: Path) -> None:
@@ -232,5 +239,31 @@ def additive_fit(xp_by_env: dict, out: Path) -> None:
         ax.set_ylabel("Cross-play return")
         ax.set_title(ENV_LABELS.get(env, env))
     axes[0, -1].legend(frameon=False, loc="lower right", markerscale=2.5)
-    fig.savefig(out)
-    plt.close(fig)
+    _save(fig, out)
+
+
+def order_shift(estimates_by_env: dict, out: Path) -> None:
+    """Return lost when teammates are reordered vs. when their features are removed, per method (95% CIs)."""
+    envs = [env for env in estimates_by_env if any("shift_drop" in e for e in estimates_by_env[env].values())]
+    fig, axes = plt.subplots(1, len(envs), figsize=(3.3 * len(envs), 2.3), squeeze=False)
+    for ax, env in zip(axes[0], envs):
+        est = estimates_by_env[env]
+        methods = [m for m in METHOD_ORDER if m in est and "shift_drop" in est[m]]
+        for i, method in enumerate(methods):
+            for offset, key, filled in [(-0.14, "shift_drop", True), (0.14, "ablation_drop", False)]:
+                e = est[method][key]
+                ax.bar(
+                    i + offset, e.mean, width=0.26, color=COLORS[method] if filled else "white", edgecolor=COLORS[method], lw=1.2
+                )
+                ax.errorbar(i + offset, e.mean, yerr=[[e.mean - e.lo], [e.hi - e.mean]], color=INK, lw=0.9, capsize=0)
+        ax.axhline(0, color=MUTED, lw=0.6)
+        ax.set_xticks(range(len(methods)), [METHOD_LABELS[m] for m in methods])
+        ax.set_ylabel("Self-play return lost")
+        ax.set_title(ENV_LABELS.get(env, env))
+        ax.grid(axis="x", visible=False)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=MUTED, edgecolor=MUTED, label="teammates reordered"),
+        plt.Rectangle((0, 0), 1, 1, facecolor="white", edgecolor=MUTED, label="teammate features removed"),
+    ]
+    fig.legend(handles=handles, frameon=False, loc="lower center", ncol=2, bbox_to_anchor=(0.5, 1.0))
+    _save(fig, out)
