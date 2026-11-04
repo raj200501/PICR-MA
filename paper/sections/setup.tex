@@ -12,56 +12,160 @@ and the others to decoy landmarks; the adversary is a separate policy trained
 against the team. For speed we re-implemented both scenarios as batched NumPy
 environments. They reproduce the reference \texttt{mpe2} implementation step for
 step (observations, rewards and seeded resets) under identical actions, which our
-test suite checks, and run about $50\times$ faster. As calibration, on our
-evaluation episodes in \texttt{simple\_spread} a uniform random policy scores
-\RefRandom{} and a scripted controller that uses global state to assign agents to
-landmarks scores \RefAssign.
+test suite checks, and run about $\EnvSpeedup\times$ faster
+(Appendix~\ref{app:env}). As calibration, on our test episodes in
+\texttt{simple\_spread} a uniform random policy scores \RefRandom{} and a
+scripted controller that uses global state to assign agents to landmarks scores
+\RefAssign.
 
 \paragraph{Learner.}
 All methods use the same shared-parameter PPO learner
-\citep{schulman2017ppo,dewitt2020ippo,yu2022mappo}: separate two-layer tanh MLPs
-(64 units) for actor and critic, per-agent GAE
-\citep{schulman2016gae} ($\gamma{=}0.99$, $\lambda_{\mathrm{GAE}}{=}0.95$), clip
-0.2, entropy coefficient 0.01, Adam with learning rate $10^{-3}$, 10 epochs of 8
-minibatches per update of 128 episodes, and $5\times10^{6}$ environment steps
-per run. These settings were tuned for \emph{IPPO alone} on a separate tuning
-seed and reused for every method (Appendix~\ref{app:tuning}), so the baseline is
-at least as well tuned as the alternatives.
+\citep{schulman2017ppo,dewitt2020ippo,yu2022mappo}. The MLP methods use
+separate two-layer tanh MLPs (64 units) for actor and critic; Deep Sets uses the
+encoder of Section~\ref{sec:method}. Per-agent GAE \citep{schulman2016gae}
+($\gamma{=}0.99$, $\lambda_{\mathrm{GAE}}{=}0.95$), clip 0.2, entropy
+coefficient 0.01, Adam with learning rate $10^{-3}$, 10 epochs of 8 minibatches
+per update of 128 episodes, and $5\times10^{6}$ environment steps per run. These
+settings were tuned for \emph{IPPO alone} on a separate tuning seed and reused
+for every method (Appendix~\ref{app:tuning}). Policies are still improving at
+this budget in \texttt{simple\_spread}, so we compare methods at a fixed budget
+and repeat the comparison at twice the budget (Appendix~\ref{app:long}).
+
+\paragraph{Evaluation episodes.}
+Training episodes draw environment seeds below $10^6$. Every reported return of
+a learned policy is scored on the same 240 \emph{test} episodes (seeds
+$10^6, \dots, 10^6{+}239$); permutation sensitivity and the reference
+controllers use the first 500 test-range seeds. The choice of $\lambda$ uses
+240 \emph{validation} episodes (seeds from $2\times10^6$). Actions are sampled
+from the stochastic policies with one fixed random stream, so all pairings face
+the same episodes and the same random numbers.
 
 \paragraph{Selecting $\lambda$.}
-\picr's weight was chosen per environment, by a rule fixed before any selection
+\picr's weight was chosen per environment by a rule fixed before any selection
 run: the $\lambda \in \{0.01, 0.03, 0.1, 0.3, 1\}$ with the highest mean
-cross-play on five selection seeds that are disjoint from the evaluation seeds.
-This gives $\lambda=\SpreadLambda$ for \texttt{simple\_spread} and
-$\lambda=\AdversaryLambda$ for \texttt{simple\_adversary}. Choosing $\lambda$ on
-cross-play favours \picr{} relative to the baselines, which have no comparable
-knob; it makes a negative result for \picr{} more informative, not less.
+cross-play among runs trained with that $\lambda$, on five selection seeds
+(100--104), scored on the validation episodes. This gives $\lambda=\SpreadLambda$
+for \texttt{simple\_spread} and $\lambda=\AdversaryLambda$ for
+\texttt{simple\_adversary}. The \texttt{simple\_spread} choice is the smallest
+weight in the grid and is not distinguishable from the others
+(Appendix~\ref{app:lambda}). Choosing $\lambda$ on cross-play can only favour
+\picr{} relative to baselines that have no comparable knob. Because $\lambda$
+controls how invariant the policy becomes, we also use the whole sweep as a
+dose-response test, with IPPO trained on the same seeds as its $\lambda=0$ end
+point.
 
 \paragraph{Zero-shot coordination.}
 For each environment we train 10 independent runs (seeds 0--9) of every method
-and evaluate \emph{all ordered pairs} of runs. For runs $A \neq B$, $A$'s policy
-controls one agent and $B$'s policy the other two; $A=B$ is self-play. Every
-pairing is scored on the same 200 evaluation episodes, whose environment seeds
-are never used in training. \emph{Self-play} (SP) is the mean over runs of the
-diagonal; \emph{cross-play} (XP) is the mean over ordered pairs of distinct
-runs of the same method; the \emph{gap} SP$-$XP measures how much a method's
-policies rely on conventions that independently trained partners do not share.
-In \texttt{simple\_adversary} every team faces the same pool of adversaries,
-those of all runs, assigned to episodes round-robin, so that methods are not
+and evaluate \emph{all ordered pairs} of runs, across methods. For runs
+$A \neq B$, $A$'s policy (the ego) controls one agent and $B$'s policy the other
+two; each pairing is played with the ego in each of the three slots and the
+three are averaged. $A=B$ is self-play. \emph{Self-play} (SP) is the mean over
+runs of the diagonal; \emph{cross-play} (XP) is the mean over ordered pairs of
+distinct runs of the same method; the \emph{gap} SP$-$XP measures how much a
+method's policies rely on conventions that independently trained partners do
+not share. In \texttt{simple\_adversary} every team composition faces the same
+pool of adversaries, the co-trained adversaries of all runs, with consecutive
+pairs of episodes assigned to pool members in turn, so that methods are not
 compared against different opponents.
 
-\paragraph{Invariance.}
+\paragraph{Order sensitivity.}
 On states visited by each final policy in self-play we report the mean
 Jensen--Shannon divergence between $\pi(\cdot\mid o)$ and $\pi(\cdot\mid\sigma o)$
 over all non-identity permutations $\sigma$ (``perm.\ JS''; at most $\ln 2$), and
 the fraction of (state, permutation) pairs on which the greedy action changes.
 
+\paragraph{Does order sensitivity cost anything?}
+Cross-play alone cannot reveal an order convention that all runs share. The
+environment lists every agent's teammates in index order, so a policy keyed to
+``the first teammate'' shares that habit with every partner. Two measurements
+change the order instead.
+\emph{Order shift.} Each run plays itself under every per-agent pattern of
+teammate orderings. With three agents each agent has two orderings, giving
+eight patterns. A pattern can be produced by relabeling the agents exactly when
+one total order of the agents is consistent with every agent's list. That holds
+for the identity and five other patterns, whose expected return equals
+self-play by symmetry, for any shared policy; they are a null control that
+measures evaluation noise. The two cyclic patterns (each agent $i$ lists agent
+$i{+}1$ before $i{+}2$, modulo 3, or the reverse) cannot be produced by any
+relabeling. The \emph{order-shift drop} is self-play return minus the mean
+return under these two patterns. To show how much the policies use teammate
+information at all, we also replace every teammate block with the one observed
+at the same step of another test episode (``teammates resampled'').
+\emph{Slot contrast.} In cross-play with the ego in the first slot, both
+partners list it as their first teammate; with the ego in the last slot, both
+list it second. Positions are otherwise exchangeable, so the difference in
+cross-play between the two seatings is zero in expectation unless returns
+depend on teammate order.
+
+\paragraph{Where cross-play losses come from.}
+We fit an additive model $R_{ij} = \mu + a_i + b_j + e_{ij}$ to the cross-play
+returns of all ordered pairs of distinct runs (all methods pooled), where $a_i$
+is run $i$'s competence as ego and $b_j$ as partner. We report the variance it
+explains and the split-half reliability of the residuals: the correlation
+between $e_{ij}$ fitted on even and on odd episodes, which face the same
+adversaries. If runs followed incompatible conventions, some pairs would fall
+well below their additive prediction, and those shortfalls would replicate
+across halves. A run's \emph{compatibility} is its mean residual over its ego
+and partner roles.
+
+\paragraph{Validating the instruments.}
+Scripted \texttt{simple\_spread} controllers with known properties go through
+the same evaluation code on the same test episodes. (a) A population of
+greedy-assignment teams in which half claim landmarks west to east and half
+east to west (four action-noise levels each) is cross-played and compared with
+a single-convention population. Mixed teams collide, so the two-convention
+population should show a gap and replicable residuals. (b) A controller that
+heads for the landmark nearest its first-listed teammate should be affected by
+the genuine order patterns but not by the relabeling patterns, while the
+greedy controller, which reads teammates only by position, should be affected
+by neither.
+
 \paragraph{Statistics.}
 Training runs are the unit of analysis \citep{henderson2018matters,agarwal2021precipice}.
-We report means with 95\% percentile-bootstrap intervals over seeds; cross-play
-intervals use a cluster bootstrap that resamples runs and recomputes the
-all-pairs mean, because pairs sharing a run are dependent. Differences between
-a method and IPPO are tested with permutation tests over run labels (10{,}000
-permutations), which recompute cross-play from the full matrix of cross-method
-pairings and are exact under the null hypothesis that the two methods produce
-exchangeable runs.
+We report means with 95\% percentile-bootstrap intervals over seeds (10{,}000
+resamples); cross-play intervals use a cluster bootstrap that resamples runs and
+recomputes the all-pairs mean, because pairs sharing a run are dependent.
+Each method is compared with IPPO by the difference of means, with a bootstrap
+interval and a permutation test over run labels (10{,}000 permutations) that
+recomputes every statistic, cross-play from the full matrix of cross-method
+pairings. The test is exact under the null hypothesis that the two methods
+produce exchangeable runs. The \emph{primary endpoint} is the difference in
+SP$-$XP gap, in which individual competence cancels. $p$-values are adjusted
+with Holm's method \citep{holm1979simple} across the four comparisons with IPPO
+for each environment and metric, and we report the minimum detectable effect
+(2.8 times the bootstrap standard error of the difference: 80\% power at
+two-sided $\alpha=0.05$). Cross-play, permutation sensitivity, order shift and
+slot contrast are secondary; the decomposition and per-run correlations are
+exploratory.
+
+\paragraph{Deviations and interim analyses.}
+The tuning procedure, the $\lambda$ grid and selection rule, the seeds, the step
+budget and the SP, XP and gap metrics were fixed before any $\lambda$-selection
+or main run. The git history records every later change. In order:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+\item An interim cross-play of the ten IPPO \texttt{simple\_spread} runs showed a
+small gap. We piloted a harder variant of \texttt{simple\_spread} in which all
+agents start clustered, and abandoned it because IPPO did not learn it
+(self-play no better than random). We then added the order-shift evaluation,
+before any comparison between methods had been computed.
+\item After a look at IPPO and \picr{} on \texttt{simple\_spread}, we added a
+teammate-ablation control, later replaced by the resampling control.
+\item After all four original methods had been compared on
+\texttt{simple\_spread} (under an earlier cross-play protocol: ego in the first
+slot only, 200 episodes), we added the additive decomposition, as exploratory.
+\item A review of the code and protocol found that the original order-shift
+test, which reversed every agent's teammate order, is a relabeling and so has
+zero expected effect for any policy. In response we redesigned the order shift
+as above, rotated the ego through all slots, moved to 240 episodes with separate
+validation and test episodes (re-running the $\lambda$ selection on the
+validation episodes, which selected the same weights), added order
+randomization as a fifth method, the slot contrast and the scripted controls,
+designated the gap difference as the primary endpoint with Holm adjustment,
+added IPPO to the $\lambda$ sweep, and added the twice-the-budget suite
+(\texttt{simple\_spread} only).
+\end{enumerate}
+All of this preceded any \texttt{simple\_adversary} main-run cross-play or order
+shift. The \texttt{simple\_spread} comparisons are therefore partly exploratory,
+since the final protocol was chosen with knowledge of interim
+\texttt{simple\_spread} results; the \texttt{simple\_adversary} comparisons were
+computed only under the final protocol.

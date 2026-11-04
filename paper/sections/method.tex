@@ -23,10 +23,11 @@ describes the same situation. A policy is \emph{teammate-order invariant} if
 $\pi_\theta(\cdot \mid \sigma o) = \pi_\theta(\cdot \mid o)$ for all $\sigma$.
 An MLP over the concatenated observation has no reason to be invariant: the
 slot a teammate occupies is determined by agent indices, so the policy can
-learn conventions keyed to ``the first teammate''.
+learn conventions keyed to ``the first teammate''. At deployment every method
+sees teammates in the environment's index order.
 
 \paragraph{Methods.}
-We compare four ways of handling teammate order, all trained with the same PPO
+We compare five ways of handling teammate order, all trained with the same PPO
 learner and hyperparameters:
 \begin{itemize}[leftmargin=1.3em,itemsep=1pt,topsep=2pt]
 \item \textbf{IPPO}: an MLP policy over $o_i$; no invariance.
@@ -36,16 +37,30 @@ learner and hyperparameters:
 \Big[\tfrac12 \KL\big(\pi_\theta(\cdot\mid\sigma_1 o)\,\|\,\pi_\theta(\cdot\mid\sigma_2 o)\big)
    + \tfrac12 \KL\big(\pi_\theta(\cdot\mid\sigma_2 o)\,\|\,\pi_\theta(\cdot\mid\sigma_1 o)\big)\Big],
 \end{equation}
-with $\sigma_1, \sigma_2$ drawn uniformly and independently per observation and
-gradients flowing through both views. The penalty is zero exactly when the
-policy is invariant on the sampled observations; the deployed network is an
-unchanged MLP.
-\item \textbf{Deep Sets}: teammate blocks pass through a shared encoder and are
-mean-pooled before the MLP \citep{zaheer2017deepsets}, making the policy
-invariant by construction.
-\item \textbf{Order augmentation}: IPPO where every policy input, during
-training only, has its teammate blocks randomly permuted. For a feedforward
-policy this is data augmentation over the observation symmetry. It is related
-in spirit to Other-Play \citep{hu2020otherplay}, but it permutes only the
-agent's view of its teammates, not the environment or the partners.
+with $\sigma_1, \sigma_2$ drawn uniformly and independently per observation in
+the PPO batch and gradients flowing through both views. The penalty is zero
+exactly when the policy is invariant on the sampled observations. With $n-1=2$
+teammate blocks the two permutations coincide with probability $1/2$, so the
+expected penalty is $\lambda/2$ times the symmetric KL between the two
+orderings. The deployed network is an unchanged MLP, with no extra parameters
+and no test-time cost.
+\item \textbf{Deep Sets}: each teammate block passes through a shared encoder
+$\phi$ (one 64-unit tanh layer), the encodings are mean-pooled, and $\rho$ (two
+64-unit tanh layers) maps the agent's own features and the pooled encoding to
+the policy head \citep{zaheer2017deepsets}; the critic has its own copy. The
+policy is invariant by construction. It is also a different and larger network
+than the MLP (Appendix~\ref{app:cost} lists parameter counts), so differences
+between Deep Sets and the MLP methods are not attributable to invariance alone.
+\item \textbf{Order augmentation}: IPPO where, while acting during training,
+every agent's teammate blocks are freshly permuted at every step, and PPO
+trains on the permuted inputs. The team's return then depends only on the
+order-averaged policy: nothing rewards the policy for agreeing with itself
+across orderings, so this does not train toward invariance.
+\item \textbf{Order randomization}: in the spirit of Other-Play
+\citep{hu2020otherplay}, each agent draws one teammate ordering at the start of
+each training episode and keeps it for the whole episode, so teams train with
+members whose views order their teammates differently but consistently. A
+policy that relies on a convention keyed to teammate slots then miscoordinates
+during training. Unlike Other-Play, the transformation applies only to each
+agent's view of its teammates, not to actions or the environment.
 \end{itemize}

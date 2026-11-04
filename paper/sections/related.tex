@@ -8,11 +8,15 @@ converge on arbitrary conventions that are mutually incompatible across
 training runs, so cross-play falls short of self-play
 \citep{carroll2019overcooked,bard2020hanabi}. Other-Play
 \citep{hu2020otherplay} removes conventions that depend on known environment
-symmetries by training against symmetry-transformed partners. Off-belief
-learning \citep{hu2021obl}, trajectory diversity \citep{lupu2021trajedi} and
-population-based training against diverse partners \citep{strouse2021fcp} are
-other routes. The symmetry we study is narrower and cheaper to exploit: the
-arbitrary order in which teammates appear in an agent's own observation.
+symmetries by training against symmetry-transformed partners. Equivariant
+networks build such symmetries into the policy instead
+\citep{muglich2022equivariant}. Off-belief learning \citep{hu2021obl},
+trajectory diversity \citep{lupu2021trajedi} and population-based training
+against diverse partners \citep{strouse2021fcp} are other routes, and ad hoc
+teamwork studies coordination with unknown teammates more broadly
+\citep{stone2010adhoc,rahman2021open}. The symmetry we study is narrower and
+cheaper to exploit: the arbitrary order in which teammates appear in an agent's
+own observation.
 
 \paragraph{Permutation invariance in MARL.}
 Set-based encoders \citep{zaheer2017deepsets} make a network invariant to the
@@ -29,7 +33,10 @@ same input is standard in semi-supervised learning \citep{sohn2020fixmatch}.
 In RL, data augmentation \citep{laskin2020rad} and regularizing the policy and
 value function to be invariant to augmentations (DrAC; \citealp{raileanu2021drac})
 improve generalization, and symmetry losses have been used to obtain symmetric
-locomotion \citep{yu2018symmetric}. \picr{} is the teammate-permutation
-instance of DrAC's policy regularizer; our contribution is the controlled
-study of whether this kind of invariance matters for ZSC, not the regularizer
-itself.
+locomotion \citep{yu2018symmetric}. DrAC regularizes the policy on one
+augmented view toward its output on the unaugmented observation, which is held
+fixed, and adds a matching value-function term. \picr{} is a symmetric
+two-view variant for teammate permutations: it compares two independently
+permuted views, back-propagates through both, and has no value term. Our
+contribution is the controlled study of whether this kind of invariance matters
+for ZSC, not the regularizer itself.
