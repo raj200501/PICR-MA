@@ -129,13 +129,14 @@ def lambda_table(suite_dir: Path) -> pd.DataFrame:
     for env in sorted(set(summaries.env)):
         xp = load_crossplay(suite_dir, env)
         for variant in sorted(set(summaries[summaries.env == env].variant)):
-            lam = float(variant.split("_lam")[1])
+            lam = float(variant.split("_lam")[1]) if "_lam" in variant else 0.0  # IPPO is the lambda = 0 reference
             block = crossplay_block(xp, variant, variant)
             runs = summaries[(summaries.env == env) & (summaries.variant == variant)]
             sp, cross, js = bootstrap_mean(np.diag(block)), bootstrap_pairs(block, True), bootstrap_mean(runs.perm_js)
             rows.append(
                 {
                     "env": env,
+                    "method": variant.split("_lam")[0],
                     "lam": lam,
                     "n_seeds": len(runs),
                     "gap": sp.mean - cross.mean,

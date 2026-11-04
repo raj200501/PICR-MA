@@ -27,9 +27,13 @@ defaults:
     max_grad_norm: 0.5
 
 suites:
+  # Scored on validation episodes (scripts/crossplay.py). IPPO is the
+  # lambda = 0 reference for the dose-response analysis, not a selection
+  # candidate; it was added after the main-suite simple_spread results had been
+  # seen (see the protocol section of the paper).
   lambda:
     envs: [simple_spread_v3, simple_adversary_v3]
-    methods: [picr]
+    methods: [picr, ippo]
     picr_lambdas: [0.01, 0.03, 0.1, 0.3, 1.0]
     seeds: [100, 101, 102, 103, 104]
 

@@ -178,44 +178,41 @@ def sensitivity_vs_crossplay(per_run_by_env: dict[str, pd.DataFrame], out: Path)
 
 
 def lambda_sweep(sweep: pd.DataFrame, out: Path) -> None:
-    """Permutation sensitivity and returns as a function of the PICR weight."""
+    """Permutation sensitivity and returns as a function of the PICR weight, with IPPO at lambda = 0."""
     envs = list(dict.fromkeys(sweep.env))
     fig, axes = plt.subplots(2, len(envs), figsize=(3.3 * len(envs), 3.8), squeeze=False, sharex=True)
     for col, env in enumerate(envs):
-        s = sweep[sweep.env == env].sort_values("lam")
-        ax = axes[0, col]
-        ax.errorbar(
-            s.lam,
-            s.perm_js,
-            yerr=[s.perm_js - s.perm_js_lo, s.perm_js_hi - s.perm_js],
-            color=COLORS["picr"],
-            marker="s",
-            ms=5,
-            lw=1.2,
-            capsize=0,
-        )
-        ax.set_yscale("log")
-        ax.set_ylabel("Permutation JS")
-        ax.set_title(ENV_LABELS.get(env, env))
-        ax = axes[1, col]
-        for key, filled, label in [("sp", False, "Self-play"), ("xp", True, "Cross-play")]:
-            ax.errorbar(
-                s.lam,
-                s[key],
-                yerr=[s[key] - s[f"{key}_lo"], s[f"{key}_hi"] - s[key]],
-                color=COLORS["picr"],
-                mfc=COLORS["picr"] if filled else "white",
-                marker="s",
-                ms=5,
-                lw=1.2,
-                ls="-" if filled else "--",
-                capsize=0,
-                label=label,
-            )
-        ax.set_ylabel("Team return")
-        ax.set_xlabel(r"PICR weight $\lambda$")
-        ax.set_xscale("symlog", linthresh=0.01)
-    axes[1, 0].legend(frameon=False, loc="best")
+        rows = sweep[sweep.env == env].sort_values("lam")
+        for method, s in rows.groupby("method", sort=False):
+            style = {"color": COLORS[method], "marker": MARKERS[method], "ms": 5, "lw": 1.2, "capsize": 0}
+            label = METHOD_LABELS[method] + (r" ($\lambda=0$)" if method == "ippo" else "")
+            ax = axes[0, col]
+            ax.errorbar(s.lam, s.perm_js, yerr=[s.perm_js - s.perm_js_lo, s.perm_js_hi - s.perm_js], label=label, **style)
+            ax = axes[1, col]
+            for key, filled, ls in [("sp", False, "--"), ("xp", True, "-")]:
+                ax.errorbar(
+                    s.lam,
+                    s[key],
+                    yerr=[s[key] - s[f"{key}_lo"], s[f"{key}_hi"] - s[key]],
+                    mfc=COLORS[method] if filled else "white",
+                    ls=ls,
+                    **style,
+                )
+        axes[0, col].set_yscale("log")
+        axes[0, col].set_title(ENV_LABELS.get(env, env))
+        axes[1, col].set_xlabel(r"PICR weight $\lambda$")
+        axes[1, col].set_xscale("symlog", linthresh=0.01)
+    axes[0, 0].set_ylabel("Permutation JS")
+    axes[1, 0].set_ylabel("Team return")
+    axes[0, 0].legend(frameon=False, loc="lower left")
+    axes[1, 0].legend(
+        handles=[
+            plt.Line2D([], [], marker="s", color=MUTED, mfc="white", ls="--", label="Self-play"),
+            plt.Line2D([], [], marker="s", color=MUTED, ls="-", label="Cross-play"),
+        ],
+        frameon=False,
+        loc="best",
+    )
     fig.align_ylabels(axes[:, 0])
     _save(fig, out)
 

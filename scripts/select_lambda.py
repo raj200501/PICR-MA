@@ -5,8 +5,10 @@
 
 Rule (fixed before any lambda-suite run was trained): for each environment,
 choose the lambda with the highest mean same-variant cross-play return on the
-selection seeds. Ties are broken toward the smaller lambda. The main suite's
-evaluation seeds are never used. Writes results/lambda/selection.json; the
+selection seeds, scored on the validation episodes. Ties are broken toward the
+smaller lambda. Other methods in the lambda suite (IPPO, as the lambda = 0
+reference) are not candidates. The main suite's runs and test episodes are
+never used. Writes results/lambda/selection.json; the
 chosen values are copied into ``picr_lambda_by_env`` in configs/experiments.yaml.
 """
 
@@ -32,7 +34,7 @@ def main() -> None:
     for env in sorted(set(summaries.env)):
         xp = load_crossplay(suite_dir, env)
         scores = {}
-        for variant in sorted(set(summaries[summaries.env == env].variant)):
+        for variant in sorted(v for v in set(summaries[summaries.env == env].variant) if v.startswith("picr_lam")):
             block = crossplay_block(xp, variant, variant)
             scores[float(variant.split("_lam")[1])] = float(block[~np.eye(len(block), dtype=bool)].mean())
         best = max(sorted(scores), key=lambda lam: scores[lam])

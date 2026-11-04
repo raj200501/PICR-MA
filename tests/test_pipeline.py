@@ -24,7 +24,7 @@ CONFIG = {
     "suites": {
         "lambda": {
             "envs": ["simple_spread_v3", "simple_adversary_v3"],
-            "methods": ["picr"],
+            "methods": ["picr", "ippo"],
             "picr_lambdas": [0.1, 1.0],
             "seeds": [100, 101],
         },

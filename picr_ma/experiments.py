@@ -1,9 +1,9 @@
 """Expand ``configs/experiments.yaml`` into concrete training runs.
 
 A suite lists environments, methods, seeds and optionally either a list of
-PICR weights to sweep (``picr_lambdas``) or one selected weight per
-environment (``picr_lambda_by_env``). Every combination becomes one run
-directory:
+PICR weights to sweep (``picr_lambdas``, which applies to PICR only; other
+methods in the suite get one variant) or one selected weight per environment
+(``picr_lambda_by_env``). Every combination becomes one run directory:
 
     results/<suite>/<env>/<method>[_lam<lambda>]/seed<k>/
 
@@ -69,12 +69,15 @@ def expand_suite(spec: dict, suite: str, results_dir: str | Path = "results", me
         if any(selected.get(env) != lam for env, lam in configured.items()):
             raise ValueError(f"picr_lambda_by_env {configured} disagrees with {selection_path} ({selected})")
     runs = []
-    for env, method, lam, seed in itertools.product(
-        suite_spec["envs"],
-        [m for m in suite_spec["methods"] if methods is None or m in methods],
-        suite_spec.get("picr_lambdas", [None]),
-        suite_spec["seeds"],
-    ):
+    combos = [
+        (env, method, lam, seed)
+        for env, method in itertools.product(
+            suite_spec["envs"], [m for m in suite_spec["methods"] if methods is None or m in methods]
+        )
+        for lam in (suite_spec.get("picr_lambdas", [None]) if method == "picr" else [None])
+        for seed in suite_spec["seeds"]
+    ]
+    for env, method, lam, seed in combos:
         fields = dict(base)
         if lam is not None:
             fields["picr_lambda"] = lam
